@@ -80,17 +80,19 @@ describe('deck bridge — nested slide markup (#1530)', () => {
     expect(state.count).toBe(8);
   });
 
-  it('still counts slides under the documented containers as direct children', async () => {
+  it('still counts slides under the documented containers as direct children and ignores decorative .slide markup outside them', async () => {
     // Pin the structured-first contract: direct children of `.deck` /
-    // `.deck-stage` / `.deck-shell` / `body` keep working as before, so
-    // the fallback is only reached for nested decks and decorative
-    // `.slide` markup in non-deck pages does not get accidentally
-    // counted just because it sits somewhere in the document.
+    // `.deck-stage` / `.deck-shell` / `body` keep working as before AND
+    // decorative `.slide` markup placed outside any structured container
+    // (e.g. a utility class on a banner graphic) is not pulled in just
+    // because it shares the class name. Without the structured-first
+    // pass a broad `.slide` selector would count 4 here, so this fixture
+    // pins the precedence directly rather than only by docstring.
     const slides = Array.from({ length: 3 }, (_, i) =>
       `<section class="slide">${i}</section>`,
     ).join('');
     const { win, parentPostMessage } = setupDeckBridge(
-      `<div class="deck">${slides}</div>`,
+      `<header><span class="slide" aria-hidden="true">decoy</span></header><div class="deck">${slides}</div>`,
     );
     await new Promise<void>((resolve) => win.setTimeout(resolve, 350));
     const state = lastSlideState(parentPostMessage);
