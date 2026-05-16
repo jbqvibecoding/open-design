@@ -73,7 +73,7 @@ jobs:
       - name: Trigger CI for metrics PR branch
         env:
           GH_TOKEN: ${{ github.token }}
-          METRICS_PR_TITLE: Auto-generated metrics for run #${{ github.run_id }}
+          METRICS_PR_TITLE: 'Auto-generated metrics for run #${{ github.run_id }}'
         run: |
           set -euo pipefail
           METRICS_BRANCH="metrics-run-${{ github.run_id }}"
