@@ -136,8 +136,9 @@ describe('connectors tool CLI', () => {
       }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ok: true,
-        output: { data: 'export function Button(){ return <button className="rounded-md" /> }' },
+        output: { data: { content: { mimetype: 'text/plain', name: 'Button.tsx', s3url: 'https://signed.example/Button.tsx' } } },
       }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
+      .mockResolvedValueOnce(new Response('export function Button(){ return <button className="rounded-md" /> }', { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         ok: true,
         output: { data: '{"dependencies":{"@radix-ui/react-slot":"latest"}}' },
@@ -164,6 +165,91 @@ describe('connectors tool CLI', () => {
       expect.objectContaining({
         method: 'POST',
         body: expect.stringContaining('github.github_get_raw_repository_content'),
+      }),
+    );
+
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('falls back to bounded connector directory browsing when the repository tree is too large', async () => {
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-connectors-cli-'));
+    process.chdir(tmpDir);
+    process.env.OD_DAEMON_URL = 'http://127.0.0.1:7456';
+    process.env.OD_TOOL_TOKEN = 'agent-run-token';
+
+    const encode = (value: string) => Buffer.from(value, 'utf8').toString('base64');
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        connectors: [{
+          id: 'github',
+          name: 'GitHub',
+          provider: 'composio',
+          category: 'Developer',
+          status: 'connected',
+          tools: [{ name: 'github.github_get_repository_content' }],
+        }],
+      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        output: { data: { default_branch: 'main', html_url: 'https://github.com/acme/ui' } },
+      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        output: { data: { path: 'README.md', encoding: 'base64', content: encode('# Acme UI') } },
+      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { code: 'CONNECTOR_OUTPUT_TOO_LARGE', message: 'connector output exceeds max serialized size' },
+      }), { headers: { 'Content-Type': 'application/json' }, status: 502 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        output: { data: { content: [
+          { path: 'package.json', type: 'file' },
+          { path: 'src', type: 'dir' },
+          { path: 'docs', type: 'dir' },
+        ] } },
+      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        output: { data: { content: [
+          { path: 'src/styles.css', type: 'file' },
+          { path: 'src/components', type: 'dir' },
+        ] } },
+      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        output: { data: { content: [{ path: 'src/components/Button.tsx', type: 'file' }] } },
+      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        output: { data: '{"dependencies":{"@radix-ui/react-slot":"latest"}}' },
+      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        output: { data: ':root { --color-brand: #ff5500; }' },
+      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        output: { data: 'export function Button(){ return <button /> }' },
+      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }));
+
+    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/ui', '--max-files', '3', '--require-connector']);
+
+    expect(result.exitCode).toBe(0);
+    const stdout = JSON.parse(stdoutOutput.join(''));
+    expect(stdout).toEqual(expect.objectContaining({
+      ok: true,
+      method: 'connector',
+      warnings: expect.arrayContaining([
+        expect.stringContaining('Recursive tree connector read failed'),
+      ]),
+    }));
+    await expect(readFile(path.join(tmpDir, 'context/github/acme-ui.md'), 'utf8')).resolves.toContain('bounded directory browsing');
+    await expect(readFile(path.join(tmpDir, 'context/github/acme-ui.md'), 'utf8')).resolves.toContain('src/components/Button.tsx');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:7456/api/tools/connectors/execute',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('github.github_get_repository_content'),
       }),
     );
 

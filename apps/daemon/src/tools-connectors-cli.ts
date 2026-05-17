@@ -52,11 +52,13 @@ const GITHUB_GET_REPOSITORY_TOOL = 'github.github_get_a_repository';
 const GITHUB_GET_TREE_TOOL = 'github.github_get_a_tree';
 const GITHUB_GET_README_TOOL = 'github.github_get_a_repository_readme';
 const GITHUB_GET_RAW_CONTENT_TOOL = 'github.github_get_raw_repository_content';
+const GITHUB_GET_REPOSITORY_CONTENT_TOOL = 'github.github_get_repository_content';
 
 const DEFAULT_GITHUB_CONTEXT_MAX_FILES = 24;
 const MAX_GITHUB_CONTEXT_FILES = 80;
 const MAX_CONTEXT_FILE_BYTES = 120_000;
 const MAX_MARKDOWN_EXCERPT_CHARS = 2_400;
+const MAX_CONNECTOR_DIRECTORY_SCAN_DIRS = 48;
 
 interface ParsedGitHubRepo {
   owner: string;
@@ -327,7 +329,8 @@ function decodeContentPayload(value: unknown): string | undefined {
     if (encoding === 'base64') return decodeBase64Content(content);
     return content;
   }
-  for (const child of Object.values(record)) {
+  for (const [key, child] of Object.entries(record)) {
+    if (key === 'mimetype' || key === 'name' || key === 's3url') continue;
     const decoded = decodeContentPayload(child);
     if (decoded !== undefined) return decoded;
   }
@@ -336,6 +339,37 @@ function decodeContentPayload(value: unknown): string | undefined {
 
 function decodeBase64Content(value: string): string {
   return Buffer.from(value.replace(/\s+/gu, ''), 'base64').toString('utf8');
+}
+
+function findConnectorSignedContentUrl(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findConnectorSignedContentUrl(item);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  const record = value as JsonObject;
+  if (typeof record.s3url === 'string' && /^https:\/\//iu.test(record.s3url)) return record.s3url;
+  for (const child of Object.values(record)) {
+    const found = findConnectorSignedContentUrl(child);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+async function readConnectorTextContent(value: unknown): Promise<string | undefined> {
+  const decoded = decodeContentPayload(value);
+  if (decoded !== undefined) return decoded;
+  const signedUrl = findConnectorSignedContentUrl(value);
+  if (!signedUrl) return undefined;
+  const response = await fetch(signedUrl);
+  if (!response.ok) {
+    throw new Error(`connector content download failed with HTTP ${response.status}`);
+  }
+  const text = await response.text();
+  return text.slice(0, MAX_CONTEXT_FILE_BYTES);
 }
 
 function extractTreePaths(value: unknown): string[] {
@@ -358,6 +392,31 @@ function extractTreePaths(value: unknown): string[] {
   return [...paths].sort((left, right) => left.localeCompare(right));
 }
 
+interface GithubDirectoryEntry {
+  path: string;
+  type: 'file' | 'dir';
+}
+
+function extractDirectoryEntries(value: unknown): GithubDirectoryEntry[] {
+  const entries = new Map<string, GithubDirectoryEntry>();
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item);
+      return;
+    }
+    const record = node as JsonObject;
+    const rawPath = typeof record.path === 'string' ? record.path : undefined;
+    const rawType = typeof record.type === 'string' ? record.type.toLowerCase() : '';
+    if (rawPath && (rawType === 'file' || rawType === 'dir')) {
+      entries.set(rawPath, { path: rawPath, type: rawType });
+    }
+    for (const child of Object.values(record)) visit(child);
+  };
+  visit(value);
+  return [...entries.values()].sort((left, right) => left.path.localeCompare(right.path));
+}
+
 function scoreDesignFile(repoPath: string): number {
   const normalized = repoPath.toLowerCase();
   if (shouldSkipRepoPath(normalized)) return -1;
@@ -374,6 +433,22 @@ function scoreDesignFile(repoPath: string): number {
   return score;
 }
 
+function scoreDesignDirectory(repoPath: string): number {
+  const normalized = repoPath.toLowerCase();
+  if (shouldSkipRepoPath(`${normalized}/`)) return -1;
+  const segments = normalized.split('/');
+  const basename = segments.at(-1) ?? normalized;
+  let score = 0;
+  if (/^(apps?|packages?|src|source|frontend|web|client|ui|components?|design-system|styles?|theme|themes|tokens?|assets?|public)$/u.test(basename)) {
+    score += 80;
+  }
+  if (/(^|\/)(apps?|packages?)\//u.test(normalized)) score += 35;
+  if (/(^|\/)(components?|ui|design-system|primitives?|styles?|theme|tokens?|assets?)$/u.test(normalized)) score += 45;
+  if (segments.length <= 2) score += 10;
+  if (segments.length > 5) score -= 20;
+  return score;
+}
+
 function shouldSkipRepoPath(normalizedPath: string): boolean {
   return /(^|\/)(node_modules|vendor|dist|build|coverage|\.next|\.nuxt|\.git|out|target|storybook-static)\//u.test(normalizedPath)
     || /(^|\/)(package-lock\.json|pnpm-lock\.ya?ml|yarn\.lock|bun\.lockb)$/u.test(normalizedPath)
@@ -387,6 +462,82 @@ function selectDesignFiles(paths: string[], maxFiles: number): string[] {
     .sort((left, right) => right.score - left.score || left.repoPath.localeCompare(right.repoPath))
     .slice(0, maxFiles)
     .map((entry) => entry.repoPath);
+}
+
+async function collectGithubTreePathsWithConnector(
+  baseUrl: URL,
+  token: string,
+  repo: ParsedGitHubRepo,
+  resolvedRef: string,
+  warnings: string[],
+): Promise<string[]> {
+  try {
+    const treePayload = await executeConnectorReadTool(baseUrl, token, GITHUB_GET_TREE_TOOL, {
+      owner: repo.owner,
+      repo: repo.repo,
+      tree_sha: resolvedRef,
+      recursive: true,
+    });
+    return extractTreePaths(treePayload);
+  } catch (error) {
+    warnings.push(
+      `Recursive tree connector read failed; falling back to bounded directory browsing: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return collectGithubTreePathsFromDirectoryListings(baseUrl, token, repo, resolvedRef, warnings);
+  }
+}
+
+async function collectGithubTreePathsFromDirectoryListings(
+  baseUrl: URL,
+  token: string,
+  repo: ParsedGitHubRepo,
+  resolvedRef: string,
+  warnings: string[],
+): Promise<string[]> {
+  const filePaths = new Set<string>();
+  const seenDirs = new Set<string>();
+  const queue: string[] = [''];
+
+  while (queue.length > 0 && seenDirs.size < MAX_CONNECTOR_DIRECTORY_SCAN_DIRS) {
+    const currentDir = queue.shift() ?? '';
+    if (seenDirs.has(currentDir)) continue;
+    seenDirs.add(currentDir);
+
+    let entries: GithubDirectoryEntry[] = [];
+    try {
+      const payload = await executeConnectorReadTool(baseUrl, token, GITHUB_GET_REPOSITORY_CONTENT_TOOL, {
+        owner: repo.owner,
+        repo: repo.repo,
+        ref: resolvedRef,
+        path: currentDir,
+      });
+      entries = extractDirectoryEntries(payload);
+    } catch (error) {
+      if (currentDir) {
+        warnings.push(`Skipped directory ${currentDir}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (entry.type === 'file') {
+        if (!shouldSkipRepoPath(entry.path.toLowerCase())) filePaths.add(entry.path);
+        continue;
+      }
+      if (entry.type === 'dir' && !seenDirs.has(entry.path) && scoreDesignDirectory(entry.path) > 0) {
+        queue.push(entry.path);
+      }
+    }
+
+    queue.sort((left, right) => scoreDesignDirectory(right) - scoreDesignDirectory(left) || left.localeCompare(right));
+  }
+
+  if (queue.length > 0) {
+    warnings.push(`Directory browsing stopped after ${MAX_CONNECTOR_DIRECTORY_SCAN_DIRS} directories; evidence is a bounded connector snapshot.`);
+  }
+  return [...filePaths].sort((left, right) => left.localeCompare(right));
 }
 
 async function collectGithubEvidenceWithConnector(
@@ -410,7 +561,7 @@ async function collectGithubEvidenceWithConnector(
       repo: repo.repo,
       ref: resolvedRef,
     });
-    const content = decodeContentPayload(readmePayload);
+    const content = await readConnectorTextContent(readmePayload);
     if (content) {
       readme = {
         path: getStringAtKeys(readmePayload, ['path', 'name']) ?? 'README.md',
@@ -421,13 +572,7 @@ async function collectGithubEvidenceWithConnector(
     warnings.push(`README connector read failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  const treePayload = await executeConnectorReadTool(baseUrl, token, GITHUB_GET_TREE_TOOL, {
-    owner: repo.owner,
-    repo: repo.repo,
-    tree_sha: resolvedRef,
-    recursive: true,
-  });
-  const treePaths = extractTreePaths(treePayload);
+  const treePaths = await collectGithubTreePathsWithConnector(baseUrl, token, repo, resolvedRef, warnings);
   const selectedPaths = selectDesignFiles(treePaths, options.maxFiles);
   const files: GithubSnapshotFile[] = [];
   for (const repoPath of selectedPaths) {
@@ -439,7 +584,7 @@ async function collectGithubEvidenceWithConnector(
         ref: resolvedRef,
         path: repoPath,
       });
-      const content = decodeContentPayload(contentPayload);
+      const content = await readConnectorTextContent(contentPayload);
       if (content === undefined) {
         warnings.push(`Skipped ${repoPath}: connector returned no readable text content`);
         continue;
