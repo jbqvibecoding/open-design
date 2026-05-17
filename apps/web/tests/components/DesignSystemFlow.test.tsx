@@ -619,6 +619,8 @@ describe('DesignSystemCreationFlow', () => {
 
     await waitFor(() => expect(mocks.connectConnector).toHaveBeenCalledWith('github'));
     await waitFor(() => expect(screen.getByText('Connected as qiongyu1999')).toBeTruthy());
+    expect(screen.queryByRole('button', { name: 'Configure' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Disconnect' })).toBeTruthy();
     const input = screen.getByPlaceholderText('https://github.com/owner/repo') as HTMLInputElement;
     expect(input.disabled).toBe(false);
 
@@ -627,6 +629,35 @@ describe('DesignSystemCreationFlow', () => {
 
     expect(screen.getByText('nexu-io/open-design')).toBeTruthy();
     expect(input.value).toBe('');
+  });
+
+  it('hides Composio connection ids in the connected GitHub label', async () => {
+    const connectedConnector: ConnectorDetail = {
+      id: 'github',
+      name: 'GitHub',
+      provider: 'Composio',
+      category: 'Code',
+      status: 'connected',
+      accountLabel: 'ca_6U6mv_8IzMVR',
+      tools: [],
+    };
+    mocks.fetchConnectorDetail.mockResolvedValue(connectedConnector);
+    const config = {
+      composio: { apiKeyConfigured: true, apiKeyTail: 'uQEg' },
+    } as AppConfig;
+
+    render(
+      <DesignSystemCreationFlow
+        onBack={() => {}}
+        onCreated={() => {}}
+        config={config}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('GitHub connected')).toBeTruthy());
+    expect(screen.queryByText(/ca_6U6mv_8IzMVR/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Configure' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Disconnect' })).toBeTruthy();
   });
 
   it('keeps a manual GitHub authorization action when the automatic popup is blocked', async () => {

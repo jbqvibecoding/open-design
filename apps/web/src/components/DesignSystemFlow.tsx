@@ -224,6 +224,7 @@ export function DesignSystemCreationFlow({
       if (result.auth?.redirectUrl) setGithubAuthorizationUrl(result.auth.redirectUrl);
       if (isPendingConnectorAuth(result.auth)) setGithubAuthorizationPending(true);
       if (result.auth?.kind === 'connected' || result.connector?.status === 'connected') {
+        setGithubConnectorError(null);
         setGithubAuthorizationPending(false);
         setGithubAuthorizationUrl(null);
       }
@@ -543,7 +544,6 @@ export function DesignSystemCreationFlow({
                 error={githubConnectorError}
                 onOpenConnectorsTab={onOpenConnectorsTab}
                 onConnect={() => void handleConnectGithub()}
-                onConfigure={() => void handleConnectGithub()}
                 onOpenAuthorization={() => openConnectorAuthorizationUrl(githubAuthorizationUrl)}
                 onDisconnect={() => void handleDisconnectGithub()}
               />
@@ -2068,7 +2068,6 @@ function GitHubConnectorGate({
   error,
   onOpenConnectorsTab,
   onConnect,
-  onConfigure,
   onOpenAuthorization,
   onDisconnect,
 }: {
@@ -2081,12 +2080,11 @@ function GitHubConnectorGate({
   error: string | null;
   onOpenConnectorsTab?: () => void;
   onConnect: () => void;
-  onConfigure: () => void;
   onOpenAuthorization: () => void;
   onDisconnect: () => void;
 }) {
   const connected = isGithubConnectorConnected(connector);
-  const account = connector?.accountLabel?.trim();
+  const account = getDisplayableGithubAccountLabel(connector);
   const busy = action !== null;
   let title = 'Connect GitHub before adding a repo';
   let description = 'Open Design needs your GitHub connector before it can analyze repository links.';
@@ -2105,7 +2103,7 @@ function GitHubConnectorGate({
     description = 'Finish authorization in the browser window, then Open Design will unlock the repo field.';
   } else if (connected) {
     title = account ? `Connected as ${account}` : 'GitHub connected';
-    description = 'Configure to grant access to more repositories, or disconnect this GitHub account.';
+    description = 'You can add repository links now, or disconnect this GitHub account.';
   } else if (composioConfigured) {
     title = 'Composio key configured';
     description = 'Connect GitHub to grant repository access before adding a repo URL.';
@@ -2139,9 +2137,6 @@ function GitHubConnectorGate({
                 Open authorization page
               </button>
             ) : null}
-            <button type="button" className="ghost" disabled={busy} onClick={onConfigure}>
-              Configure
-            </button>
             <button type="button" className="ghost" disabled={busy} onClick={onDisconnect}>
               {action === 'disconnect' ? 'Disconnecting...' : 'Disconnect'}
             </button>
@@ -2154,6 +2149,16 @@ function GitHubConnectorGate({
       </div>
     </div>
   );
+}
+
+function getDisplayableGithubAccountLabel(connector: ConnectorDetail | null): string | null {
+  const label = connector?.accountLabel?.trim();
+  if (!label) return null;
+  // Composio may surface its connected-account id (`ca_...`) as the label.
+  // That is useful internally, but it reads like a broken GitHub username in
+  // this setup flow.
+  if (/^ca_[A-Za-z0-9_-]+$/.test(label)) return null;
+  return label;
 }
 
 function openConnectorAuthorizationUrl(url: string | null): void {
