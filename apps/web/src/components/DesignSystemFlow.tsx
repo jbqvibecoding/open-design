@@ -67,6 +67,7 @@ interface DetailProps {
   config: AppConfig;
   agents: AgentInfo[];
   onBack: () => void;
+  onOpenProject?: (projectId: string) => void;
   onSetDefault: (id: string) => void;
   onSystemsRefresh?: () => Promise<void> | void;
   onProjectsRefresh?: () => Promise<void> | void;
@@ -620,6 +621,7 @@ export function DesignSystemDetailView({
   config,
   agents,
   onBack,
+  onOpenProject,
   onSetDefault,
   onSystemsRefresh,
   onProjectsRefresh,
@@ -652,6 +654,7 @@ export function DesignSystemDetailView({
   const chatCancelRef = useRef<AbortController | null>(null);
   const pendingWorkspaceFileWritesRef = useRef<Map<string, string>>(new Map());
   const workspaceTabsLoadedRef = useRef(false);
+  const openedProjectRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -666,6 +669,7 @@ export function DesignSystemDetailView({
     setChatSeed(null);
     setWorkspaceTabsState({ tabs: [], active: null });
     setWorkspaceOpenRequest(null);
+    openedProjectRef.current = null;
     workspaceTabsLoadedRef.current = false;
     pendingWorkspaceFileWritesRef.current.clear();
     void fetchDesignSystem(id).then((detail) => {
@@ -691,12 +695,17 @@ export function DesignSystemDetailView({
       if (cancelled || !workspace) return;
       setWorkspaceProjectId(workspace.project.id);
       setWorkspaceProjectFiles(workspace.files);
+      if (onOpenProject && openedProjectRef.current !== workspace.project.id) {
+        openedProjectRef.current = workspace.project.id;
+        await onProjectsRefresh?.();
+        if (!cancelled) onOpenProject(workspace.project.id);
+      }
     }
     void syncWorkspaceProject();
     return () => {
       cancelled = true;
     };
-  }, [system]);
+  }, [onOpenProject, onProjectsRefresh, system]);
 
   useEffect(() => {
     if (!workspaceProjectId) return undefined;

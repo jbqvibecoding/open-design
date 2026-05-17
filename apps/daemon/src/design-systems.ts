@@ -547,7 +547,6 @@ async function ensureGeneratedDesignSystemFiles(root: string, id: string): Promi
   try {
     const body = await readFile(path.join(root, id, 'DESIGN.md'), 'utf8');
     const metadata = await readUserMetadata(root, id);
-    if (metadata.artifactMode === 'agent-managed') return;
     const title = normalizeTitle(metadata.title ?? firstHeading(body) ?? id);
     const category = metadata.category ?? extractCategory(body) ?? 'Custom';
     const surface = metadata.surface ?? extractSurface(body);

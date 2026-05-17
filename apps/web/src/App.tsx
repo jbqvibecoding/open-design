@@ -1176,6 +1176,7 @@ export function App() {
         config={config}
         agents={agents}
         onBack={() => navigate({ kind: 'home', view: 'design-systems' })}
+        onOpenProject={(projectId) => navigate({ kind: 'project', projectId, conversationId: null, fileName: null })}
         onSetDefault={handleChangeDefaultDesignSystem}
         onSystemsRefresh={refreshDesignSystems}
         onProjectsRefresh={refreshProjects}

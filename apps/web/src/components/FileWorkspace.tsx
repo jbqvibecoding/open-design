@@ -1451,7 +1451,7 @@ function DesignSystemProjectPanel({
             <div key={group.title} className="ds-project-section-group">
               <h2>{group.title}</h2>
               {group.items.map((item) =>
-                renderReviewCard(item, `${group.title}:${item.section.title}`, false),
+                renderReviewCard(item, `${group.title}:${item.section.title}`, Boolean(item.previewFile)),
               )}
             </div>
           ))}
