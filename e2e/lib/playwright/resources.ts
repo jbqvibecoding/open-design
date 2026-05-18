@@ -43,7 +43,7 @@ export interface UiScenario {
     tab?: 'prototype' | 'deck' | 'template' | 'other';
     railChip?: 'prototype' | 'deck' | 'hyperframes';
     expectedProjectKind?: 'prototype' | 'deck' | 'video';
-    expectedPluginId?: 'od-new-generation' | 'example-hyperframes';
+    expectedPluginId?: 'example-web-prototype' | 'example-simple-deck' | 'example-hyperframes';
   };
   prompt: string;
   secondaryPrompt?: string;

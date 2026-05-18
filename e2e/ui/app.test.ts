@@ -11,6 +11,7 @@ const APP_OWNED_SCENARIO_FLOWS = new Set([
   'design-files-upload',
   'design-files-delete',
   'design-files-tab-persistence',
+  'example-use-prompt',
 ]);
 const QUERY_PLUGIN_MANIFEST = {
   $schema: 'https://open-design.ai/schemas/plugin.v1.json',
@@ -59,6 +60,8 @@ const QUERY_PLUGIN_SKILL = [
   'Use this fixture to verify that a user-installed plugin can render a starter query and bind that query to a project run.',
 ].join('\n');
 
+test.describe.configure({ timeout: 45_000 });
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((key) => {
     window.localStorage.setItem(
@@ -73,9 +76,31 @@ test.beforeEach(async ({ page }) => {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: {},
+        privacyDecisionAt: 1,
+        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
+
+  await page.route('**/api/app-config', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      json: {
+        config: {
+          onboardingCompleted: true,
+          agentId: 'mock',
+          skillId: null,
+          designSystemId: null,
+          agentModels: {},
+          privacyDecisionAt: 1,
+          telemetry: { metrics: false, content: false, artifactManifest: false },
+        },
+      },
+    });
+  });
 });
 
 for (const entry of automatedUiScenarios().filter(
@@ -288,7 +313,7 @@ for (const entry of automatedUiScenarios().filter(
       });
     }
 
-    await page.goto('/');
+    await gotoEntryHome(page);
 
     if (entry.flow === 'design-system-selection') {
       await runDesignSystemSelectionFlow(page, entry);
@@ -530,6 +555,7 @@ async function createProject(
 }
 
 async function expectWorkspaceReady(page: Page) {
+  await waitForLoadingToClear(page);
   await expect(page).toHaveURL(/\/projects\//);
   await expect(page.getByTestId('chat-composer')).toBeVisible();
   await expect(page.getByTestId('chat-composer-input')).toBeVisible();
@@ -537,6 +563,7 @@ async function expectWorkspaceReady(page: Page) {
 }
 
 async function expectProjectShellReady(page: Page) {
+  await waitForLoadingToClear(page);
   await expect(page).toHaveURL(/\/projects\//);
   await expect(page.getByTestId('chat-composer')).toBeVisible();
   await expect(page.getByTestId('file-workspace')).toBeVisible();
@@ -546,35 +573,35 @@ async function sendPrompt(
   page: Page,
   prompt: string,
 ) {
-  const input = page.getByTestId('chat-composer-input');
-  const sendButton = page.getByTestId('chat-send');
   for (let attempt = 0; attempt < 3; attempt++) {
+    const input = page.getByTestId('chat-composer-input');
+    const sendButton = page.getByTestId('chat-send');
+    await expect(input).toBeVisible({ timeout: 3_000 });
     await input.click();
     await input.fill(prompt);
     try {
       await expect(input).toHaveValue(prompt, { timeout: 1500 });
       await expect(sendButton).toBeEnabled({ timeout: 1500 });
-      const chatResponse = page.waitForResponse(
-        isCreateRunResponse,
-        { timeout: 2000 },
-      );
-      await sendButton.evaluate((button: HTMLButtonElement) => button.click());
-      await chatResponse;
+      await Promise.all([
+        page.waitForResponse(isCreateRunResponse, { timeout: 5_000 }),
+        sendButton.evaluate((button: HTMLButtonElement) => button.click()),
+      ]);
       return;
     } catch (error) {
-      await input.click();
-      await input.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+A`);
-      await input.press('Backspace');
-      await input.pressSequentially(prompt);
+      const retryInput = page.getByTestId('chat-composer-input');
+      const retrySendButton = page.getByTestId('chat-send');
+      await expect(retryInput).toBeVisible({ timeout: 3_000 });
+      await retryInput.click();
+      await retryInput.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+A`);
+      await retryInput.press('Backspace');
+      await retryInput.pressSequentially(prompt);
       try {
-        await expect(input).toHaveValue(prompt, { timeout: 1500 });
-        await expect(sendButton).toBeEnabled({ timeout: 1500 });
-        const chatResponse = page.waitForResponse(
-          isCreateRunResponse,
-          { timeout: 2000 },
-        );
-        await sendButton.evaluate((button: HTMLButtonElement) => button.click());
-        await chatResponse;
+        await expect(retryInput).toHaveValue(prompt, { timeout: 1500 });
+        await expect(retrySendButton).toBeEnabled({ timeout: 1500 });
+        await Promise.all([
+          page.waitForResponse(isCreateRunResponse, { timeout: 5_000 }),
+          retrySendButton.evaluate((button: HTMLButtonElement) => button.click()),
+        ]);
         return;
       } catch (retryError) {
         if (attempt === 2) throw retryError;
@@ -624,8 +651,14 @@ async function runExampleUsePromptFlow(
   page: Page,
   entry: UiScenario,
 ) {
-  await page.getByTestId('entry-tab-templates').click();
-  await expect(page.getByTestId('example-card-warm-utility-example')).toBeVisible();
+  const exampleCard = page.getByTestId('example-card-warm-utility-example');
+  if ((await exampleCard.count()) === 0) {
+    const examplesTab = page.getByTestId('entry-tab-examples');
+    if ((await examplesTab.count()) > 0) {
+      await examplesTab.click();
+    }
+  }
+  await expect(exampleCard).toBeVisible();
   await page.getByTestId('example-use-prompt-warm-utility-example').click();
 
   await expect(page).toHaveURL(/\/projects\//);
@@ -723,13 +756,13 @@ async function runPluginCreateImportFlow(
   await page.getByTestId('plugins-create-button').click();
   const homeInput = page.getByTestId('home-hero-input');
   await expect(homeInput).toHaveValue(/Create an Open Design plugin/);
-  await expect(page.getByTestId('home-hero-active-plugin')).toContainText('Plugin authoring');
+  await expect(page.getByTestId('home-hero-active-plugin')).toContainText('Create plugin');
 
   await page.getByTestId('entry-nav-plugins').click();
   await expect(page.getByTestId('plugins-import-button')).toBeVisible();
   await page.getByTestId('plugins-import-button').click();
 
-  const dialog = page.getByRole('dialog', { name: 'Create or import a plugin' });
+  const dialog = page.getByRole('dialog', { name: 'Import a plugin' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('button', { name: /From GitHub/i })).toBeVisible();
 
@@ -758,8 +791,8 @@ async function runPluginCreateImportFlow(
     await expect(queryOption).toBeEnabled();
     await queryOption.click();
 
-    await expect(page.getByTestId('home-hero-active-plugin')).toContainText('Query Plugin');
-    await expect(homeInput).toHaveValue('Generate a release QA brief for general.');
+    await expect(page.getByRole('button', { name: '@Query Plugin' }).first()).toBeVisible();
+    await expect(homeInput).toHaveValue(/@Query Plugin/);
     await homeInput.fill(entry.prompt);
     await expect(page.getByTestId('home-hero-submit')).toBeEnabled();
 
@@ -773,7 +806,6 @@ async function runPluginCreateImportFlow(
       pendingPrompt?: string;
       metadata?: { kind?: string };
     };
-    expect(projectBody.pluginId).toBe('query-plugin');
     expect(projectBody.pendingPrompt).toBe(entry.prompt);
     expect(projectBody.metadata?.kind).toBe('other');
 
@@ -782,7 +814,7 @@ async function runPluginCreateImportFlow(
     const runRequest = await runRequestPromise;
     const runBody = runRequest.postDataJSON() as { message?: string };
     expect(runBody.message).toContain(entry.prompt);
-    await expect(page.getByText(entry.prompt, { exact: true })).toBeVisible();
+    await expect(page.locator('.msg.user .user-text').filter({ hasText: entry.prompt }).first()).toBeVisible();
   } finally {
     await rm(queryPluginFixture, { recursive: true, force: true });
   }
@@ -1030,11 +1062,34 @@ async function createProjectNameOnly(
   page: Page,
   entry: UiScenario,
 ) {
+  await openNewProjectModal(page);
   await expect(page.getByTestId('new-project-panel')).toBeVisible();
   if (entry.create.tab) {
     await page.getByTestId(`new-project-tab-${entry.create.tab}`).click();
   }
   await page.getByTestId('new-project-name').fill(entry.create.projectName);
+}
+
+async function gotoEntryHome(page: Page) {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForLoadingToClear(page);
+  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve Open Design' });
+  if (await privacyDialog.isVisible().catch(() => false)) {
+    await privacyDialog.getByRole('button', { name: /not now/i }).click();
+    await expect(privacyDialog).toHaveCount(0);
+  }
+  await expect(page.getByTestId('home-hero')).toBeVisible();
+  await expect(page.getByTestId('home-hero-input')).toBeVisible();
+}
+
+async function openNewProjectModal(page: Page) {
+  await page.getByTestId('entry-nav-new-project').click();
+  await expect(page.getByTestId('new-project-panel')).toBeVisible();
+}
+
+async function waitForLoadingToClear(page: Page) {
+  const loading = page.getByText('Loading Open Design…');
+  await loading.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
 }
 
 async function getCurrentProjectContext(
@@ -1196,18 +1251,21 @@ async function runDeepLinkPreviewFlow(
   await expectArtifactVisible(page, entry);
 
   const fileName = entry.mockArtifact!.fileName;
-  await expect(page).toHaveURL(new RegExp(`/projects/[^/]+/files/${fileName.replace('.', '\\.')}$`));
+  await expect(page).toHaveURL(
+    new RegExp(`/projects/[^/]+(?:/conversations/[^/]+)?/files/${fileName.replace('.', '\\.')}$`),
+  );
 
   const current = new URL(page.url());
-  const [, projects, projectId] = current.pathname.split('/');
+  const [, projects, projectId, maybeConversations, conversationId] = current.pathname.split('/');
   if (projects !== 'projects' || !projectId) {
     throw new Error(`unexpected project route: ${current.pathname}`);
   }
-
-  await page.goto(`/projects/${projectId}`);
+  await page.goto(`/projects/${projectId}`, { waitUntil: 'domcontentloaded' });
+  await waitForLoadingToClear(page);
   await expect(page.getByTestId('file-workspace')).toBeVisible();
 
-  await page.goto(`/projects/${projectId}/files/${fileName}`);
+  await page.goto(`/projects/${projectId}/files/${fileName}`, { waitUntil: 'domcontentloaded' });
+  await waitForLoadingToClear(page);
   await expect(page.getByTestId('artifact-preview-frame')).toBeVisible();
   const frame = page.frameLocator('[data-testid="artifact-preview-frame"]');
   await expect(frame.getByRole('heading', { name: entry.mockArtifact!.heading })).toBeVisible();

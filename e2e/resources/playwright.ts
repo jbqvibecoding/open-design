@@ -64,7 +64,7 @@ export const playwrightUiScenarios: UiScenario[] = [
       projectName: 'Rail prototype project',
       railChip: 'prototype',
       expectedProjectKind: 'prototype',
-      expectedPluginId: 'od-new-generation',
+      expectedPluginId: 'example-web-prototype',
     },
     prompt: 'Create a compact onboarding prototype from the Home rail prototype chip',
     mockArtifact: {
@@ -92,7 +92,7 @@ export const playwrightUiScenarios: UiScenario[] = [
       projectName: 'Rail slide deck project',
       railChip: 'deck',
       expectedProjectKind: 'deck',
-      expectedPluginId: 'od-new-generation',
+      expectedPluginId: 'example-simple-deck',
     },
     prompt: 'Create a three-slide strategy deck from the Home rail slide deck chip',
     mockArtifact: {

@@ -47,6 +47,7 @@ interface Props {
   projectKind: TrackingProjectKind;
   files: ProjectFile[];
   liveArtifacts: LiveArtifactSummary[];
+  filesRefreshKey?: number;
   onRefreshFiles: () => Promise<void> | void;
   isDeck: boolean;
   onExportAsPptx?: ((fileName: string) => void) | undefined;
@@ -88,6 +89,7 @@ export function FileWorkspace({
   projectKind,
   files,
   liveArtifacts,
+  filesRefreshKey = 0,
   onRefreshFiles,
   isDeck,
   onExportAsPptx,
@@ -796,6 +798,7 @@ export function FileWorkspace({
             projectId={projectId}
             projectKind={projectKind}
             file={activeFile}
+            filesRefreshKey={filesRefreshKey}
             isDeck={isDeck}
             onExportAsPptx={onExportAsPptx}
             streaming={streaming}

@@ -185,10 +185,13 @@ export interface ComposeInput {
   // - `designSystemTokensCss`    — verbatim `tokens.css` :root contract
   //                                that the agent pastes into the
   //                                artifact's <style>.
-  // - `designSystemFixtureHtml`  — verbatim `components.html` reference
-  //                                fixture demonstrating button / card /
-  //                                type-scale shapes wired to the tokens.
+  // - `designSystemComponentsManifest` — concise structured summary
+  //                                      derived from components.html.
+  // - `designSystemFixtureHtml`        — verbatim `components.html`
+  //                                      fallback when no manifest can
+  //                                      be derived.
   designSystemTokensCss?: string | undefined;
+  designSystemComponentsManifest?: string | undefined;
   designSystemFixtureHtml?: string | undefined;
   // Craft references the active skill opted into via `od.craft.requires`.
   // The daemon resolves the slug list to file contents and concatenates
@@ -271,6 +274,7 @@ export function composeSystemPrompt({
   designSystemBody,
   designSystemTitle,
   designSystemTokensCss,
+  designSystemComponentsManifest,
   designSystemFixtureHtml,
   craftBody,
   craftSections,
@@ -348,18 +352,23 @@ export function composeSystemPrompt({
   // sets voice and intent; the tokens.css block below is the SAME
   // contract in machine-readable form — names + values the agent pastes
   // verbatim instead of re-deriving from prose. The components.html
-  // fixture grounds the token vocabulary in worked component shapes
-  // (button / card / type roles) so the agent can copy fragments
-  // directly. Both blocks are individually gated: missing files (today,
-  // every brand except `default` and `kami`) skip silently, preserving
-  // the legacy DESIGN.md-only behaviour for the other ~138 brands.
+  // manifest grounds the token vocabulary in worked component shapes
+  // (button / card / type roles) without injecting the full HTML fixture.
+  // If manifest extraction fails or is unavailable, the composer falls
+  // back to the verbatim components.html fixture. Both blocks are
+  // individually gated: missing files skip silently, preserving the
+  // legacy DESIGN.md-only behaviour for prose-only brands.
   if (designSystemTokensCss && designSystemTokensCss.trim().length > 0) {
     parts.push(
       `\n\n## Active design system tokens${designSystemTitle ? ` — ${designSystemTitle}` : ''}\n\nThe block below is this brand's tokens.css contract — every \`:root\` custom property and any scoped override (e.g. \`:root[lang=...]\`) the brand defines. **Paste the unscoped \`:root { ... }\` block verbatim into the artifact's first \`<style>\`** so every \`var(--*)\` reference resolves at runtime.\n\nDo not invent new tokens. Do not redefine these values. Do not write raw hex outside this :root block. The DESIGN.md above is prose; this is the binding contract.\n\n\`\`\`css\n${designSystemTokensCss.trim()}\n\`\`\``,
     );
   }
 
-  if (designSystemFixtureHtml && designSystemFixtureHtml.trim().length > 0) {
+  if (designSystemComponentsManifest && designSystemComponentsManifest.trim().length > 0) {
+    parts.push(
+      `\n\n## Reference component manifest${designSystemTitle ? ` — ${designSystemTitle}` : ''}\n\nA compact structured summary derived from this brand's components.html fixture. Use it as the component inventory for generated artifacts: match the listed selectors, component groups, class names, token references, focus behavior, and spacing cadence. Prefer these manifest entries over inventing new component shapes.\n\n\`\`\`text\n${designSystemComponentsManifest.trim()}\n\`\`\``,
+    );
+  } else if (designSystemFixtureHtml && designSystemFixtureHtml.trim().length > 0) {
     parts.push(
       `\n\n## Reference fixture${designSystemTitle ? ` — ${designSystemTitle}` : ''}\n\nA self-contained worked artifact in this design system. Match its component shapes (button structure, card structure, type-scale rhythm, focus ring, spacing cadence) when generating new artifacts. Copying fragments is encouraged as long as you keep the \`var(--*)\` references intact — they are already wired to the tokens above.\n\n\`\`\`html\n${designSystemFixtureHtml.trim()}\n\`\`\``,
     );
@@ -482,6 +491,19 @@ export function composeSystemPrompt({
 
   const mcpDirective = renderConnectedExternalMcpDirective(connectedExternalMcp);
   if (mcpDirective) parts.push(mcpDirective);
+
+  // Claude only: nudge the model toward the `AskUserQuestion` tool for
+  // mid-conversation clarifications. Without this hint Claude tends to fall
+  // back to a markdown bulleted list of options, which the chat UI cannot
+  // turn into clickable buttons. Discovery (turn 1) is still owned by the
+  // `<question-form>` flow defined in DISCOVERY_AND_PHILOSOPHY; this only
+  // covers follow-ups where the next action depends on a small set of
+  // choices the user can pick quickly.
+  if (agentId === 'claude') {
+    parts.push(
+      "\n\n---\n\n## Clarifying questions\n\nWhen you need a mid-conversation clarification AND the natural answer is one of a small finite set of choices (2-4 options per question), call the `AskUserQuestion` tool instead of writing a bulleted list in markdown. The host chat renders the tool call as inline choice buttons; a markdown list renders as plain text and forces the user to type a reply. Skip the tool when the answer is naturally free-form text, when the answer needs more than ~4 options, or when you only have one yes/no choice to ask. First-turn discovery still uses the `<question-form id=\"discovery\">` workflow described earlier; `AskUserQuestion` is for follow-ups only.\n\n**When you call `AskUserQuestion`, that tool call is the entire response.** Do NOT also write the same questions or options as markdown text alongside it, do NOT add a trailing prose paragraph like \"what sounds right?\", do NOT hedge by listing the options twice. Emit the tool call and stop generating tokens. The host is waiting on the tool's `tool_result` and will resume your turn the moment the user answers. Anything you write before, between, or after the tool call in the same message just duplicates what the card already shows and confuses the user.",
+    );
+  }
 
   return parts.join('');
 }
