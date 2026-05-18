@@ -54,9 +54,16 @@
 /* ---------- Output-type tab bar ----------
    Sits above the input card and lets the user pick a creation
    mode (Prototype, Slide deck, Image, Video, etc.) before typing.
-   Replaces the first chip row that previously lived below the card
-   in the rail. Active tab shows a colored underline; the bar bottom
-   border visually connects to the input card below. */
+   Folder-tab visual: the bar itself has no baseline border; the
+   input card's top edge serves as the baseline. The active tab
+   borrows the card's panel color and border so it reads as a
+   continuous "flap" attached to the card top — this gives the
+   strong "tabs belong to this chat box" cue that a free-floating
+   underline cannot. Labels are text-only; icons were removed
+   because the seven labels (Prototype, Live artifact, Slide deck,
+   Image, Video, HyperFrames, Audio) already disambiguate at the
+   sizes used here and the icons added visual noise without an
+   information gain. */
 .home-hero__type-tabs {
   width: 100%;
   max-width: 720px;
@@ -64,41 +71,52 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 2px;
-  border-bottom: 1px solid var(--border);
-  /* Push the tab bar away from the title/subtitle pair so the
-     reader perceives "headline group" then "input group". The
-     bottom collapse keeps tabs visually attached to the chat
-     box border below. */
+  position: relative;
+  z-index: 1;
+  /* The parent .home-hero uses `gap: 14px`; pulling the bottom
+     margin back by 14px collapses that gap so the active tab can
+     sit flush against the card top (with its own -1px margin
+     covering the card's top border). The top margin restores the
+     breathing room above the bar after the title/subtitle pair. */
   margin: 14px 0 -14px;
-  padding: 0 4px;
+  padding: 0 12px;
 }
 .home-hero__type-tab {
   appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 7px 11px 8px;
-  border: none;
-  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 8px 8px 0 0;
+  /* Reach 1px past the bar baseline so an active tab's bottom edge
+     overlays the input card's top border, hiding it for the width
+     of the tab and producing the folder-tab merge. */
   margin-bottom: -1px;
   background: transparent;
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
-  line-height: 1;
+  line-height: 1.3;
   letter-spacing: -0.005em;
   cursor: pointer;
-  border-radius: 6px 6px 0 0;
   transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
 }
 .home-hero__type-tab:hover:not(:disabled) {
   color: var(--text);
-  background: var(--bg-subtle);
+  background: color-mix(in srgb, var(--bg-subtle) 70%, transparent);
 }
 .home-hero__type-tab.is-active {
+  background: var(--bg-panel);
+  border-color: var(--border);
+  /* Paint the bottom border with the panel color so it visually
+     erases the input card's own top border for the width of this
+     tab, completing the folder-tab merge. */
+  border-bottom-color: var(--bg-panel);
   color: var(--text-strong);
-  border-bottom-color: var(--accent);
   font-weight: 600;
+}
+.home-hero__type-tab.is-active:hover:not(:disabled) {
+  background: var(--bg-panel);
 }
 .home-hero__type-tab.is-pending {
   opacity: 0.65;
@@ -110,15 +128,6 @@
 .home-hero__type-tab:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--accent-tint);
-}
-.home-hero__type-tab-icon {
-  flex: 0 0 auto;
-  opacity: 0.7;
-  transition: opacity 120ms ease;
-}
-.home-hero__type-tab:hover:not(:disabled) .home-hero__type-tab-icon,
-.home-hero__type-tab.is-active .home-hero__type-tab-icon {
-  opacity: 1;
 }
 
 .home-hero__input-card {
@@ -133,7 +142,11 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 8px;
+  /* Card top sits exactly at the tab bar bottom (tab bar margin
+     cancels the parent flex gap) so the active folder-tab can
+     overlap the card border by 1px and read as one continuous
+     surface with the chat box. */
+  margin-top: 0;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 .home-hero__input-card:focus-within {

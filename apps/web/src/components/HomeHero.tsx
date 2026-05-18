@@ -1405,7 +1405,6 @@ function TypeTabBar({
             aria-selected={isActive}
             title={chip.hint ?? chip.label}
           >
-            <Icon name={chip.icon} size={13} className="home-hero__type-tab-icon" />
             <span>{chip.label}</span>
           </button>
         );
