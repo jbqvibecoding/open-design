@@ -311,8 +311,31 @@
 .home-hero__prompt-slot-select {
   width: auto;
   max-width: min(100%, 32ch);
-  padding-right: 18px;
+  /* Reserves room for the chevron overlay rendered by the
+     surrounding `.home-hero__prompt-slot-select-wrap`. */
+  padding-right: 22px;
   cursor: pointer;
+}
+/* Wrap span around <select> slots that hosts the chevron indicator.
+   The wrap is `inline-flex` so it shrinks to the <select>'s natural
+   width and so the chevron can be positioned absolutely against the
+   select's trailing padding without disturbing the surrounding text
+   flow of the prompt overlay. */
+.home-hero__prompt-slot-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: baseline;
+  max-width: 100%;
+}
+.home-hero__prompt-slot-select-chevron {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent);
+  pointer-events: none;
+  opacity: 0.85;
 }
 .home-hero__prompt-slot-toggle {
   cursor: pointer;

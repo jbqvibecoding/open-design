@@ -1162,20 +1162,32 @@ function InlinePromptInput({
   }
 
   if (field && type === 'select' && Array.isArray(field.options)) {
+    // Wrap the <select> so we can lay an explicit chevron over the
+    // trailing padding. The slot's own `appearance: none` strips the
+    // native chevron, which previously left select-type slots
+    // visually indistinguishable from free-text slots — users had no
+    // affordance hinting the value was switchable.
     return (
-      <select
-        {...commonProps}
-        className={`${commonProps.className} home-hero__prompt-slot-select`}
-        value={value !== undefined && value !== null ? String(value) : ''}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">{field.placeholder ?? 'Select...'}</option>
-        {field.options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
+      <span className="home-hero__prompt-slot-select-wrap">
+        <select
+          {...commonProps}
+          className={`${commonProps.className} home-hero__prompt-slot-select`}
+          value={value !== undefined && value !== null ? String(value) : ''}
+          onChange={(event) => onChange(event.target.value)}
+        >
+          <option value="">{field.placeholder ?? 'Select...'}</option>
+          {field.options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        <Icon
+          name="chevron-down"
+          size={11}
+          className="home-hero__prompt-slot-select-chevron"
+        />
+      </span>
     );
   }
 
