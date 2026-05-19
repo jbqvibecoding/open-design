@@ -122,6 +122,14 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('entry chrome settings dialog opens with brand header and no pet rail', async ({ page }) => {
+  await page.route('**/api/projects', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ json: { projects: [] } });
+      return;
+    }
+    await route.continue();
+  });
+
   await gotoEntryHome(page);
   await expect(page.getByTestId('entry-star-badge')).toBeVisible();
   await expect(page.getByTestId('entry-use-everywhere-button')).toBeVisible();

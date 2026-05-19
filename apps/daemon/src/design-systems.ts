@@ -3,6 +3,11 @@
 // with only DESIGN.md remain valid. Without a manifest, title comes from the
 // first H1, category from a `> Category: <name>` blockquote line beneath the
 // H1, and summary from the first paragraph between the H1 and next heading.
+//
+// YAML frontmatter (Google spec, issue #1857): frontmatter `colors` wins
+// over Markdown swatches only when its row fills every semantic slot;
+// otherwise Markdown wins. Other fields (`name`/`description`/`category`/
+// `surface`) fall back to frontmatter when the body has none.
 
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -11,6 +16,9 @@ import {
   extractComponentsManifest,
   summarizeComponentsManifestForPrompt,
 } from '@open-design/contracts';
+
+import { parseFrontmatter } from './frontmatter.js';
+import type { FrontmatterObject, FrontmatterValue } from './frontmatter.js';
 
 export type DesignSystemSurface = 'web' | 'image' | 'video' | 'audio';
 
@@ -25,6 +33,7 @@ export type DesignSystemSummary = {
 };
 
 type ColorToken = { name: string; value: string };
+type SwatchRow = { values: string[]; filledAllSlots: boolean };
 type DesignSystemProjectManifest = {
   schemaVersion: 'od-design-system-project/v1';
   id: string;
@@ -55,15 +64,34 @@ export async function listDesignSystems(root: string): Promise<DesignSystemSumma
       const stats = await stat(designPath);
       if (!stats.isFile()) continue;
       const raw = await readFile(designPath, 'utf8');
-      const titleMatch = /^#\s+(.+?)\s*$/m.exec(raw);
-      const title = manifest?.name ?? cleanTitle(titleMatch?.[1] ?? entry.name);
+      const { data: frontmatter, body } = parseFrontmatter(raw);
+      const titleMatch = /^#\s+(.+?)\s*$/m.exec(body);
+      const markdownTitle =
+        titleMatch?.[1] !== undefined ? cleanTitle(titleMatch[1]) : '';
+      const localTitle =
+        markdownTitle || stringField(frontmatter, 'name') || entry.name;
+      const title = manifest?.name ?? localTitle;
+      const markdownSummary = summarize(body);
+      const markdownSwatches = extractSwatches(body);
+      const frontmatterSwatchRow = swatchesFromFrontmatter(frontmatter);
+      const swatches = pickFinalSwatchRow(frontmatterSwatchRow, markdownSwatches);
       out.push({
         id: entry.name,
         title,
-        category: manifest?.category ?? extractCategory(raw) ?? 'Uncategorized',
-        summary: manifest?.description?.trim() || summarize(raw),
-        swatches: extractSwatches(raw),
-        surface: extractSurface(raw),
+        category:
+          manifest?.category
+          ?? extractCategory(body)
+          ?? stringField(frontmatter, 'category')
+          ?? 'Uncategorized',
+        summary:
+          (manifest?.description?.trim() || markdownSummary)
+          || stringField(frontmatter, 'description')
+          || '',
+        swatches,
+        surface:
+          extractSurface(body)
+          ?? frontmatterSurface(frontmatter)
+          ?? 'web',
         body: raw,
       });
     } catch {
@@ -71,6 +99,44 @@ export async function listDesignSystems(root: string): Promise<DesignSystemSumma
     }
   }
   return out;
+}
+
+function stringField(data: FrontmatterObject, key: string): string {
+  const v: FrontmatterValue | undefined = data[key];
+  return typeof v === 'string' ? v.trim() : '';
+}
+
+function frontmatterSurface(data: FrontmatterObject): DesignSystemSurface | undefined {
+  const v = stringField(data, 'surface').toLowerCase();
+  return isDesignSystemSurface(v) ? v : undefined;
+}
+
+function swatchesFromFrontmatter(data: FrontmatterObject): SwatchRow | null {
+  const raw = data['colors'];
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const colors: ColorToken[] = [];
+  const seen = new Set<string>();
+  for (const [name, value] of Object.entries(raw)) {
+    if (typeof value !== 'string') continue;
+    const hex = normalizeHex(value);
+    if (!hex) continue;
+    const cleanName = name.replace(/\s+/g, ' ').trim().toLowerCase();
+    const key = `${cleanName}|${hex}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    colors.push({ name: cleanName, value: hex });
+  }
+  if (colors.length === 0) return null;
+  return pickSwatchRow(colors);
+}
+
+function pickFinalSwatchRow(
+  frontmatter: SwatchRow | null,
+  markdownSwatches: string[],
+): string[] {
+  if (frontmatter !== null && frontmatter.filledAllSlots) return frontmatter.values;
+  if (markdownSwatches.length > 0) return markdownSwatches;
+  return frontmatter?.values ?? [];
 }
 
 export async function readDesignSystem(root: string, id: string): Promise<string | null> {
@@ -309,11 +375,11 @@ function extractCategory(raw: string): string | undefined {
 }
 
 const KNOWN_SURFACES = new Set<DesignSystemSurface>(['web', 'image', 'video', 'audio']);
-function extractSurface(raw: string): DesignSystemSurface {
+function extractSurface(raw: string): DesignSystemSurface | undefined {
   const m = /^>\s*Surface:\s*(.+?)\s*$/im.exec(raw);
-  if (!m) return 'web';
+  if (!m) return undefined;
   const v = m[1]?.trim().toLowerCase();
-  return isDesignSystemSurface(v) ? v : 'web';
+  return isDesignSystemSurface(v) ? v : undefined;
 }
 
 function isDesignSystemSurface(value: string | undefined): value is DesignSystemSurface {
@@ -365,7 +431,10 @@ function extractSwatches(raw: string): string[] {
   const reB = /\*\*([A-Za-z][A-Za-z0-9 /&()+_-]{1,40}?)\*\*\s*\(?\s*`?(#[0-9a-fA-F]{3,8})/g;
   while ((m = reB.exec(raw)) !== null) push(m[1] ?? '', m[2] ?? '');
   if (colors.length === 0) return [];
+  return pickSwatchRow(colors).values;
+}
 
+function pickSwatchRow(colors: ColorToken[]): SwatchRow {
   function pick(hints: string[]): string | null {
     for (const h of hints) {
       const found = colors.find((c) => c.name.includes(h));
@@ -381,25 +450,28 @@ function extractSwatches(raw: string): string[] {
     return Math.max(r, g, b) - Math.min(r, g, b) < 10;
   }
 
-  const bg =
-    pick(['page background', 'background', 'canvas', 'paper', 'surface'])
-    ?? '#ffffff';
-  const fg =
-    pick(['heading', 'foreground', 'ink', 'fg', 'text', 'navy', 'graphite'])
-    ?? '#111111';
+  const bgHit = pick(['page background', 'background', 'canvas', 'paper', 'surface']);
+  const fgHit = pick(['heading', 'foreground', 'ink', 'fg', 'text', 'navy', 'graphite']);
+  const accentHit = pick(['primary brand', 'brand primary', 'accent', 'brand', 'primary']);
+  const supportHit = pick(['border', 'divider', 'rule', 'muted', 'secondary', 'subtle']);
+
+  const bg = bgHit ?? '#ffffff';
+  const fg = fgHit ?? '#111111';
   const accent =
-    pick(['primary brand', 'brand primary', 'accent', 'brand', 'primary'])
+    accentHit
     ?? colors.find((c) => !isNeutral(c.value))?.value
     ?? colors[0]?.value
     ?? '#888888';
   const support =
-    pick(['border', 'divider', 'rule', 'muted', 'secondary', 'subtle'])
+    supportHit
     ?? colors.find(
       (c) => isNeutral(c.value) && c.value !== bg && c.value !== fg,
     )?.value
     ?? '#cccccc';
 
-  return [bg, support, fg, accent];
+  const filledAllSlots =
+    bgHit !== null && fgHit !== null && accentHit !== null && supportHit !== null;
+  return { values: [bg, support, fg, accent], filledAllSlots };
 }
 
 function normalizeHex(raw: string): string | null {

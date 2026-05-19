@@ -101,8 +101,8 @@ export function EntryNavRail({ view, onViewChange, onNewProject }: Props) {
         </NavButton>
         <NavButton
           active={view === 'tasks'}
-          ariaLabel="Automations"
-          tooltip="Automations"
+          ariaLabel={t('entry.navTasks')}
+          tooltip={t('entry.navTasks')}
           onClick={() => onViewChange('tasks')}
           testId="entry-nav-tasks"
         >
@@ -131,8 +131,8 @@ export function EntryNavRail({ view, onViewChange, onNewProject }: Props) {
         </NavButton>
         <NavButton
           active={view === 'integrations'}
-          ariaLabel="Integrations"
-          tooltip="Integrations"
+          ariaLabel={t('entry.navIntegrations')}
+          tooltip={t('entry.navIntegrations')}
           onClick={() => onViewChange('integrations')}
           testId="entry-nav-integrations"
         >

@@ -2283,9 +2283,9 @@ a.avatar-item:visited {
 /* -------- Mention popover ------------------------------------------- */
 .mention-popover {
   order: -1;
-  flex: 0 0 clamp(248px, 38vh, 320px);
+  flex: 0 0 clamp(300px, 52vh, 480px);
   min-height: 248px;
-  max-height: 320px;
+  max-height: min(480px, 72vh);
   margin: 0 0 6px;
   background: var(--bg-panel);
   border: 1px solid var(--border);

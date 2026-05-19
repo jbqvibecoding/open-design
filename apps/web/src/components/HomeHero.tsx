@@ -36,6 +36,7 @@ import {
   inlineMentionToken,
   type InlineMentionEntity,
 } from '../utils/inlineMentions';
+import { useT } from '../i18n';
 
 export interface HomeHeroSubmitHandler {
   (): void;
@@ -144,6 +145,7 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
   },
   ref,
 ) {
+  const t = useT();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mentionTab, setMentionTab] = useState<HomeMentionTab>('all');
   const [hoveredPlugin, setHoveredPlugin] = useState<InstalledPluginRecord | null>(null);
@@ -155,8 +157,8 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canSubmit = (prompt.trim().length > 0 || stagedFiles.length > 0) && !submitDisabled;
   const placeholder = activePluginTitle || activeSkillTitle
-    ? 'Edit the example query or write your own…'
-    : 'Describe a design, paste or drop files, or @search plugins, skills, or MCP…';
+    ? t('homeHero.placeholderActive')
+    : t('homeHero.placeholder');
   const mention = getContextMention(prompt);
   const mentionActive = Boolean(mention);
   const mentionQuery = mention?.query ?? '';
@@ -183,9 +185,9 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
   );
   const pickerOpen = mentionActive;
   const tabs: Array<{ id: HomeMentionTab; label: string; count: number }> = [
-    { id: 'all', label: 'All', count: pluginMatches.length + skillMatches.length + mcpMatches.length },
-    { id: 'plugins', label: 'Plugins', count: pluginMatches.length },
-    { id: 'skills', label: 'Skills', count: skillMatches.length },
+    { id: 'all', label: t('common.all'), count: pluginMatches.length + skillMatches.length + mcpMatches.length },
+    { id: 'plugins', label: t('entry.navPlugins'), count: pluginMatches.length },
+    { id: 'skills', label: t('homeHero.skills'), count: skillMatches.length },
     { id: 'mcp', label: 'MCP', count: mcpMatches.length },
   ];
   const showPlugins = mentionTab === 'all' || mentionTab === 'plugins';
@@ -195,13 +197,13 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
     showPlugins
       ? {
           id: 'plugins',
-          label: 'Plugins',
+          label: t('entry.navPlugins'),
           options: pluginMatches.map((plugin) => ({
             id: `plugin-${plugin.id}`,
             icon: 'sparkles',
             title: plugin.title,
             description: plugin.manifest?.description ?? plugin.id,
-            meta: pendingPluginId === plugin.id ? 'Applying…' : getPluginSourceLabel(plugin),
+            meta: pendingPluginId === plugin.id ? t('homeHero.applying') : getPluginSourceLabel(plugin),
             pluginRecord: plugin,
             disabled: pendingPluginId !== null,
             onPick: () => pickPlugin(plugin),
@@ -211,13 +213,13 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
     showSkills
       ? {
           id: 'skills',
-          label: 'Skills',
+          label: t('homeHero.skills'),
           options: skillMatches.map((skill) => ({
             id: `skill-${skill.id}`,
             icon: skill.id === activeSkillId ? 'check' : 'file',
             title: skill.name,
             description: skill.description || skill.id,
-            meta: skill.id === activeSkillId ? 'Active' : skill.mode,
+            meta: skill.id === activeSkillId ? t('common.active') : skill.mode,
             onPick: () => pickSkill(skill),
           })),
         }
@@ -405,9 +407,9 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
 
   return (
     <section className="home-hero" data-testid="home-hero">
-      <h1 className="home-hero__title">What do you want to design?</h1>
+      <h1 className="home-hero__title">{t('homeHero.title')}</h1>
       <p className="home-hero__subtitle">
-        Pick a type to load an example query, or just type freely and press{' '}
+        {t('homeHero.subtitlePrefix')}{' '}
         <kbd>Enter</kbd>.
       </p>
 
@@ -448,7 +450,7 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
                   type="button"
                   className="home-hero__active-chip-body"
                   onClick={() => onOpenPluginDetails(plugin)}
-                  title={`Plugin: ${plugin.title}`}
+                  title={t('homeHero.pluginTitle', { title: plugin.title })}
                 >
                   <span className="home-hero__active-dot" aria-hidden />
                   <span>@{plugin.title}</span>
@@ -457,8 +459,8 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
                   type="button"
                   className="home-hero__active-clear"
                   onClick={() => onRemovePluginContext(plugin.id)}
-                  aria-label={`Remove plugin ${plugin.title}`}
-                  title="Remove plugin"
+                  aria-label={t('homeHero.removePluginAria', { title: plugin.title })}
+                  title={t('homeHero.removePlugin')}
                 >
                   ×
                 </button>
@@ -479,17 +481,17 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
                   }}
                   onClick={openActivePluginDetails}
                   disabled={!activePluginRecord}
-                  title={activePluginRecord ? `Plugin: ${activePluginRecord.title}` : undefined}
+                  title={activePluginRecord ? t('homeHero.pluginTitle', { title: activePluginRecord.title }) : undefined}
                 >
                   <span className="home-hero__active-dot" aria-hidden />
-                  <span>Plugin: {activePluginTitle}</span>
+                  <span>{t('homeHero.pluginPrefix', { title: activePluginTitle })}</span>
                 </button>
                 <button
                   type="button"
                   className="home-hero__active-clear"
                   onClick={onClearActivePlugin}
-                  aria-label="Clear active plugin"
-                  title="Clear active plugin"
+                  aria-label={t('homeHero.clearActivePlugin')}
+                  title={t('homeHero.clearActivePlugin')}
                 >
                   ×
                 </button>
@@ -501,13 +503,13 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
                 data-testid="home-hero-active-skill"
               >
                 <span className="home-hero__active-dot" aria-hidden />
-                <span>Skill: {activeSkillTitle}</span>
+                <span>{t('homeHero.skillPrefix', { title: activeSkillTitle })}</span>
                 <button
                   type="button"
                   className="home-hero__active-clear"
                   onClick={onClearActiveSkill}
-                  aria-label="Clear active skill"
-                  title="Clear active skill"
+                  aria-label={t('homeHero.clearActiveSkill')}
+                  title={t('homeHero.clearActiveSkill')}
                 >
                   ×
                 </button>
@@ -515,7 +517,7 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
             ) : null}
             {contextItemCount > 0 ? (
               <span className="home-hero__context-summary">
-                {contextItemCount} context items resolved
+                {t('homeHero.contextItemsResolved', { n: contextItemCount })}
               </span>
             ) : null}
           </div>
@@ -672,8 +674,8 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
                   type="button"
                   className="home-hero__attachment-remove"
                   onClick={() => onRemoveFile(index)}
-                  aria-label={`Remove ${file.name}`}
-                  title="Remove file"
+                  aria-label={t('chat.removeAria', { name: file.name })}
+                  title={t('homeHero.removeFile')}
                 >
                   <Icon name="close" size={10} />
                 </button>
@@ -686,10 +688,10 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
             id="home-hero-context-picker"
             className="home-hero__plugin-picker"
             role="listbox"
-            aria-label="Context search results"
+            aria-label={t('homeHero.contextSearchResults')}
             data-testid="home-hero-plugin-picker"
           >
-            <div className="home-hero__mention-tabs" role="tablist" aria-label="Context surfaces">
+            <div className="home-hero__mention-tabs" role="tablist" aria-label={t('homeHero.contextSurfaces')}>
               {tabs.map((item) => (
                 <button
                   key={item.id}
@@ -709,14 +711,14 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
               ))}
             </div>
             {visibleLoading && visiblePickerOptions.length === 0 ? (
-              <div className="home-hero__plugin-picker-empty">Loading context…</div>
+              <div className="home-hero__plugin-picker-empty">{t('homeHero.loadingContext')}</div>
             ) : null}
             {!visibleLoading && visiblePickerOptions.length === 0 ? (
               <div className="home-hero__plugin-picker-empty">
                 {mentionQuery ? (
-                  <>No results for “{mentionQuery}”.</>
+                  <>{t('homeHero.noResults', { query: mentionQuery })}</>
                 ) : (
-                  <>Search plugins, skills, and MCP servers.</>
+                  <>{t('homeHero.searchPrompt')}</>
                 )}
               </div>
             ) : null}
@@ -773,7 +775,7 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
                   <p>{hoveredPlugin.manifest?.description ?? hoveredPlugin.id}</p>
                 </div>
                 <div className="home-hero__plugin-hover-meta">
-                  <span>{(hoveredPlugin.manifest?.od?.inputs ?? []).length} parameters</span>
+                  <span>{t('homeHero.parameters', { n: (hoveredPlugin.manifest?.od?.inputs ?? []).length })}</span>
                   {getPluginQueryPreview(hoveredPlugin) ? (
                     <span>{getPluginQueryPreview(hoveredPlugin)}</span>
                   ) : null}
@@ -783,7 +785,7 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => onOpenPluginDetails(hoveredPlugin)}
                 >
-                  Details
+                  {t('homeHero.details')}
                 </button>
               </div>
             ) : null}
@@ -808,13 +810,13 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
               className="home-hero__attach"
               data-testid="home-hero-attach"
               onClick={() => fileInputRef.current?.click()}
-              title="Attach files"
-              aria-label="Attach files"
+              title={t('chat.attachAria')}
+              aria-label={t('chat.attachAria')}
             >
               <Icon name="attach" size={18} />
             </button>
             <span className="home-hero__hint">
-              <kbd>↵</kbd> to run · <kbd>Shift</kbd>+<kbd>↵</kbd> for new line
+              <kbd>↵</kbd> {t('homeHero.toRun')} · <kbd>Shift</kbd>+<kbd>↵</kbd> {t('homeHero.forNewLine')}
             </span>
           </div>
           <button
@@ -823,8 +825,8 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
             data-testid="home-hero-submit"
             onClick={onSubmit}
             disabled={!canSubmit}
-            title={canSubmit ? 'Run' : 'Type something to run'}
-            aria-label="Run"
+            title={canSubmit ? t('homeHero.run') : t('homeHero.typeSomethingToRun')}
+            aria-label={t('homeHero.run')}
           >
             <Icon name="arrow-up" size={22} />
           </button>
@@ -834,7 +836,7 @@ export const HomeHero = forwardRef<HTMLTextAreaElement, Props>(function HomeHero
       <div
         className="home-hero__rail"
         role="toolbar"
-        aria-label="Pick a starter shortcut"
+        aria-label={t('homeHero.railAria')}
         data-testid="home-hero-rail"
       >
         <RailGroup
@@ -1475,6 +1477,7 @@ function RailGroup({
   pluginsLoading,
   onPickChip,
 }: RailGroupProps) {
+  const t = useT();
   const chips = useMemo(() => chipsForGroup(group), [group]);
   return (
     <div
@@ -1497,13 +1500,42 @@ function RailGroup({
             onClick={() => onPickChip(chip)}
             disabled={pluginsLoading || isPending || pendingPluginId !== null}
             aria-pressed={isActive}
-            title={chip.hint ?? chip.label}
+            title={homeHeroChipTitle(chip, t)}
           >
             <Icon name={chip.icon} size={14} className="home-hero__rail-chip-icon" />
-            <span className="home-hero__rail-chip-label">{chip.label}</span>
+            <span className="home-hero__rail-chip-label">{homeHeroChipLabel(chip.id, t)}</span>
           </button>
         );
       })}
     </div>
   );
+}
+
+function homeHeroChipLabel(chipId: string, t: ReturnType<typeof useT>): string {
+  switch (chipId) {
+    case 'prototype': return t('homeHero.chip.prototype');
+    case 'live-artifact': return t('homeHero.chip.liveArtifact');
+    case 'deck': return t('homeHero.chip.deck');
+    case 'image': return t('homeHero.chip.image');
+    case 'video': return t('homeHero.chip.video');
+    case 'hyperframes': return t('homeHero.chip.hyperframes');
+    case 'audio': return t('homeHero.chip.audio');
+    case 'create-plugin': return t('homeHero.chip.createPlugin');
+    case 'figma': return t('homeHero.chip.figma');
+    case 'folder': return t('homeHero.chip.folder');
+    case 'template': return t('homeHero.chip.template');
+    default: return chipId;
+  }
+}
+
+function homeHeroChipTitle(chip: HomeHeroChip, t: ReturnType<typeof useT>): string {
+  switch (chip.id) {
+    case 'live-artifact': return t('homeHero.chip.liveArtifactHint');
+    case 'hyperframes': return t('homeHero.chip.hyperframesHint');
+    case 'create-plugin': return t('homeHero.chip.createPluginHint');
+    case 'figma': return t('homeHero.chip.figmaHint');
+    case 'folder': return t('homeHero.chip.folderHint');
+    case 'template': return t('homeHero.chip.templateHint');
+    default: return homeHeroChipLabel(chip.id, t);
+  }
 }

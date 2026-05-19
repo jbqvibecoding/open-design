@@ -43,14 +43,14 @@ export function RecentProjectsStrip({
   return (
     <section className="recent-projects" data-testid="recent-projects-strip">
       <header className="recent-projects__head">
-        <h2 className="recent-projects__title">Recent projects</h2>
+        <h2 className="recent-projects__title">{t('recentProjects.title')}</h2>
         <button
           type="button"
           className="recent-projects__view-all"
           onClick={onViewAll}
           data-testid="recent-projects-view-all"
         >
-          <span>View all</span>
+          <span>{t('recentProjects.viewAll')}</span>
           <Icon name="chevron-right" size={12} />
         </button>
       </header>
