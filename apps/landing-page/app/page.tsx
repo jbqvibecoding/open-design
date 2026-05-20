@@ -1212,7 +1212,7 @@ export default function Page({
               <div className='foot-brand'>
                 <a href='#top' className='brand'>
                   <span className='brand-mark'>
-                    <img src='/favicon.png' alt='' width={36} height={36} />
+                    <img src='/logo.webp' alt='' width={36} height={36} />
                   </span>
                   <span>Open Design</span>
                 </a>
