@@ -1864,6 +1864,36 @@ function reconcileAssistantMessageOnRunEnd(db, runs, run) {
     });
 }
 
+function pinAssistantMessageOnRunCreate(db, run) {
+  if (!run.conversationId || !run.assistantMessageId) return;
+  const existing = db
+    .prepare(`SELECT id FROM messages WHERE id = ?`)
+    .get(run.assistantMessageId);
+  if (existing) {
+    db.prepare(
+      `UPDATE messages
+          SET run_id = ?,
+              run_status = CASE
+                WHEN run_status IN ('succeeded', 'failed', 'canceled') THEN run_status
+                ELSE ?
+              END,
+              started_at = COALESCE(started_at, ?)
+        WHERE id = ?`,
+    ).run(run.id, run.status, run.createdAt, run.assistantMessageId);
+    return;
+  }
+  upsertMessage(db, run.conversationId, {
+    id: run.assistantMessageId,
+    role: 'assistant',
+    content: '',
+    agentId: run.agentId ?? undefined,
+    events: [],
+    runId: run.id,
+    runStatus: run.status,
+    startedAt: run.createdAt,
+  });
+}
+
 export function shouldReportRunCompletedFromMessage(saved, body = {}) {
   return Boolean(
     saved &&
@@ -10536,6 +10566,11 @@ export async function startServer({
       }
     }
     const run = design.runs.create(meta);
+    try {
+      pinAssistantMessageOnRunCreate(db, run);
+    } catch (err) {
+      console.warn('[runs] message create pin failed', err);
+    }
     // Capture clientType for downstream telemetry (Langfuse uses it on
     // run-completed metadata; PostHog gets it via the request header
     // bridge). Prefer the explicit `x-od-client` header from desktop /
