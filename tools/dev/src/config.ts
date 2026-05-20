@@ -162,7 +162,7 @@ export function resolveToolDevConfig(options: ToolDevOptions = {}): ToolDevConfi
       },
       desktop: {
         ...desktop,
-        sidecarEntryPath: path.join(WORKSPACE_ROOT, "apps/desktop/src/dev-launcher.ts"),
+        sidecarEntryPath: path.join(WORKSPACE_ROOT, "apps/desktop/sidecar/dev-launcher.ts"),
       },
       web: {
         ...web,

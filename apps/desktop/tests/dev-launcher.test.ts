@@ -15,7 +15,7 @@ import {
   createDesktopElectronEnv,
   resolveDesktopMainEntryPath,
   runDesktopDevLauncher,
-} from '../src/dev-launcher.js';
+} from '../sidecar/dev-launcher.js';
 
 function createDesktopStampArgs(ipcPath: string): string[] {
   return createProcessStampArgs(
