@@ -3615,7 +3615,7 @@ export function ProjectView({
                     setInstructionsMode((m) => (m === 'closed' ? 'edit' : 'closed'));
                   }}
                 >
-                  <Icon name="file" size={hasProjectInstructions ? 11 : 13} />
+                  <Icon name="sliders" size={hasProjectInstructions ? 11 : 13} />
                   {hasProjectInstructions ? <span>{t('project.customInstructions')}</span> : null}
                 </button>
               );
@@ -3636,7 +3636,7 @@ export function ProjectView({
               <span className="project-linked-dirs" data-testid="project-linked-dirs">
                 {linkedDirs.map((dir) => (
                   <span key={dir} className="linked-dir-chip">
-                    <Icon name="folder" size={13} />
+                    <Icon name="link" size={13} />
                     <span className="linked-dir-name" title={dir}>
                       {dir.split('/').pop() || dir}
                     </span>
