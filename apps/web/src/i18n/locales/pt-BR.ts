@@ -1153,6 +1153,7 @@ export const ptBR: Dict = {
   'tool.askQuestionSubmit': 'Enviar',
   'tool.askQuestionPending': 'Aguardando sua resposta',
   'tool.askQuestionAnswered': 'Respondido',
+  'tool.askQuestionCustomPlaceholder': 'Ou escreva sua própria resposta...',
   'tool.todosExpand': 'Mostrar tarefas',
   'tool.todosCollapse': 'Ocultar tarefas',
   'tool.todosDone': 'Concluído',

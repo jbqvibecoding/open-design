@@ -1000,6 +1000,7 @@ export const de: Dict = {
   'tool.askQuestionSubmit': 'Senden',
   'tool.askQuestionPending': 'Warte auf deine Antwort',
   'tool.askQuestionAnswered': 'Beantwortet',
+  'tool.askQuestionCustomPlaceholder': 'Oder eigene Antwort schreiben...',
   'tool.todosExpand': 'Aufgaben einblenden',
   'tool.todosCollapse': 'Aufgaben ausblenden',
   'tool.todosDone': 'Fertig',

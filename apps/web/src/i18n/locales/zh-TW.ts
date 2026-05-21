@@ -1203,6 +1203,7 @@ export const zhTW: Dict = {
   'tool.askQuestionSubmit': '提交',
   'tool.askQuestionPending': '等待你的回答',
   'tool.askQuestionAnswered': '已回答',
+  'tool.askQuestionCustomPlaceholder': '或自由填寫…',
   'tool.todosExpand': '展開任務',
   'tool.todosCollapse': '收起任務',
   'tool.todosDone': '完成',

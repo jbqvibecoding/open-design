@@ -999,6 +999,7 @@ export const ja: Dict = {
   'tool.askQuestionSubmit': '送信',
   'tool.askQuestionPending': '回答をお待ちしています',
   'tool.askQuestionAnswered': '回答済み',
+  'tool.askQuestionCustomPlaceholder': 'または自由に入力...',
   'tool.todosExpand': 'タスクを表示',
   'tool.todosCollapse': 'タスクを非表示',
   'tool.todosDone': '完了',

@@ -1112,6 +1112,7 @@ export const hu: Dict = {
   'tool.askQuestionSubmit': 'Beküldés',
   'tool.askQuestionPending': 'Várjuk a válaszodat',
   'tool.askQuestionAnswered': 'Megválaszolva',
+  'tool.askQuestionCustomPlaceholder': 'Vagy írj saját választ...',
   'tool.todosExpand': 'Feladatok mutatása',
   'tool.todosCollapse': 'Feladatok elrejtése',
   'tool.todosDone': 'Kész',

@@ -1677,6 +1677,7 @@ export const en: Dict = {
   'tool.askQuestionSubmit': 'Submit',
   'tool.askQuestionPending': 'Awaiting your answer',
   'tool.askQuestionAnswered': 'Answered',
+  'tool.askQuestionCustomPlaceholder': 'Or write your own...',
   'tool.todosExpand': 'Show tasks',
   'tool.todosCollapse': 'Hide tasks',
   'tool.todosDone': 'Done',

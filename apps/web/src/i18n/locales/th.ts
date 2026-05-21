@@ -1073,6 +1073,7 @@ export const th: Dict = {
   'tool.askQuestionSubmit': 'ส่ง',
   'tool.askQuestionPending': 'รอคำตอบของคุณ',
   'tool.askQuestionAnswered': 'ตอบแล้ว',
+  'tool.askQuestionCustomPlaceholder': 'หรือเขียนคำตอบเอง...',
   'tool.todosExpand': 'แสดงงาน',
   'tool.todosCollapse': 'ซ่อนงาน',
   'tool.todosDone': 'เสร็จสิ้น',

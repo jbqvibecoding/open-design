@@ -1099,6 +1099,7 @@ export const tr: Dict = {
   'tool.askQuestionSubmit': 'Gönder',
   'tool.askQuestionPending': 'Cevabınız bekleniyor',
   'tool.askQuestionAnswered': 'Cevaplandı',
+  'tool.askQuestionCustomPlaceholder': 'Ya da kendi yanıtınızı yazın...',
   'tool.todosExpand': 'Görevleri göster',
   'tool.todosCollapse': 'Görevleri gizle',
   'tool.todosDone': 'Tamam',

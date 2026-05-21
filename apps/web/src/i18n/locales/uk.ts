@@ -1154,6 +1154,7 @@ export const uk: Dict = {
   'tool.askQuestionSubmit': 'Надіслати',
   'tool.askQuestionPending': 'Очікую вашої відповіді',
   'tool.askQuestionAnswered': 'Відповідь надано',
+  'tool.askQuestionCustomPlaceholder': 'Або введіть власну відповідь...',
   'tool.todosExpand': 'Показати завдання',
   'tool.todosCollapse': 'Сховати завдання',
   'tool.todosDone': 'Готово',

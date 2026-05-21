@@ -1001,6 +1001,7 @@ export const esES: Dict = {
   'tool.askQuestionSubmit': 'Enviar',
   'tool.askQuestionPending': 'Esperando tu respuesta',
   'tool.askQuestionAnswered': 'Respondido',
+  'tool.askQuestionCustomPlaceholder': 'O escribe tu propia respuesta...',
   'tool.todosExpand': 'Mostrar tareas',
   'tool.todosCollapse': 'Ocultar tareas',
   'tool.todosDone': 'Listo',

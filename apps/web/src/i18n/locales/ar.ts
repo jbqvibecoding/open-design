@@ -1112,6 +1112,7 @@ export const ar: Dict = {
   'tool.askQuestionSubmit': 'إرسال',
   'tool.askQuestionPending': 'في انتظار إجابتك',
   'tool.askQuestionAnswered': 'تمت الإجابة',
+  'tool.askQuestionCustomPlaceholder': 'أو اكتب إجابتك...',
   'tool.todosExpand': 'عرض المهام',
   'tool.todosCollapse': 'إخفاء المهام',
   'tool.todosDone': 'تم',

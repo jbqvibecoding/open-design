@@ -1645,6 +1645,7 @@ export const zhCN: Dict = {
   'tool.askQuestionSubmit': '提交',
   'tool.askQuestionPending': '等待你的回答',
   'tool.askQuestionAnswered': '已回答',
+  'tool.askQuestionCustomPlaceholder': '或自由填写…',
   'tool.todosExpand': '展开任务',
   'tool.todosCollapse': '收起任务',
   'tool.todosDone': '完成',

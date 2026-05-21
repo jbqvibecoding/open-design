@@ -13538,6 +13538,29 @@ button.ghost.mcp-copy-btn:hover:not(:disabled) {
   color: var(--text-muted);
   white-space: normal;
 }
+.op-ask-question-custom {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.op-ask-question-custom::placeholder {
+  color: var(--text-faint);
+}
+.op-ask-question-custom:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+.op-ask-question-custom:disabled {
+  cursor: default;
+  opacity: 0.9;
+}
 .op-ask-question-foot {
   display: flex;
   justify-content: flex-end;
