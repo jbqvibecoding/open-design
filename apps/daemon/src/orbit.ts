@@ -514,8 +514,7 @@ export class OrbitService {
   ): Promise<{ projectId: string; agentRunId: string }> {
     const runOptions = normalizeOrbitRunOptions(options);
     const locale = runOptions.locale;
-    const localeWasRequested = locale !== null;
-    if ((this.inflight || this.starting) && localeWasRequested && !orbitRunLocalesMatch(this.activeLocale, locale)) {
+    if ((this.inflight || this.starting) && !orbitRunLocalesMatch(this.activeLocale, locale)) {
       throw orbitLocaleConflictError(this.activeLocale, locale);
     }
     if (this.inflight && this.inflightProjectId && this.inflightAgentRunId) {

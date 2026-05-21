@@ -347,6 +347,49 @@ describe('OrbitService', () => {
     }
   });
 
+  it('does not reuse a localized run for a default-locale request with empty options', async () => {
+    const dataDir = await mkdtemp(path.join(os.tmpdir(), 'orbit-test-'));
+    try {
+      const service = new OrbitService(dataDir);
+      let resolveCompletion!: (value: {
+        agentRunId: string;
+        status: 'succeeded';
+      }) => void;
+      const completion = new Promise<{
+        agentRunId: string;
+        status: 'succeeded';
+      }>((resolve) => {
+        resolveCompletion = resolve;
+      });
+      service.setRunHandler(async () => ({
+        projectId: 'project-1',
+        agentRunId: 'agent-1',
+        completion,
+      }));
+
+      await service.start('manual', { locale: 'zh-CN' });
+
+      await expect(service.start('manual', {}))
+        .rejects.toMatchObject({
+          message: 'orbit run already in progress with Simplified Chinese (zh-CN); cannot attach request for the default locale',
+          status: 409,
+        });
+
+      resolveCompletion({
+        agentRunId: 'agent-1',
+        status: 'succeeded',
+      });
+      await completion;
+      let status = await service.status();
+      for (let attempt = 0; attempt < 10 && status.running; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        status = await service.status();
+      }
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it('reuses a default-locale run for an explicit English request', async () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), 'orbit-test-'));
     try {
