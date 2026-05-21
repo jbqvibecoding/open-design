@@ -11,10 +11,18 @@
 //     agent often writes a skeleton then edits to fill it in; both end
 //     in a new file state at run end.
 //   - Read-only ops never count.
+//   - Failed ops never count. A `tool_use` whose matching `tool_result`
+//     reports `isError: true` (permission denied, path outside cwd,
+//     parent missing, etc.) does NOT produce an artifact even though
+//     the tool name and path were correct. Earlier the helper skipped
+//     this join, so a "Write index.html" that errored still bumped
+//     `artifact_count` to 1 and corrupted the
+//     "generation_success → artifact_produced" funnel (mrcfps review
+//     on PR #2590).
 //
-// Earlier `server.ts:11061` hard-coded `artifact_count: 0`, which
-// produced uniform zero on PostHog and made the v2 "generation
-// success → produced artifact" funnel useless.
+// Earlier `server.ts` hard-coded `artifact_count: 0`, which produced
+// uniform zero on PostHog and made the same funnel useless from the
+// other direction.
 
 // Tool names cover Claude-style, Codex-style, and the ACP/MCP shapes
 // the daemon proxies. Keep aligned with the web-side `WRITE_NAMES` /
@@ -45,8 +53,51 @@ export interface RunEventLike {
   data?: unknown;
 }
 
+// Join key the daemon-stream uses for tool_use → tool_result pairing.
+// Claude / Codex / ACP all stamp the same `id` onto the `tool_use`
+// event and reference it via `toolUseId` on the subsequent
+// `tool_result`; see `apps/daemon/src/langfuse-bridge.ts#collectToolCalls`
+// for the canonical implementation.
+function readToolUseId(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const obj = data as { id?: unknown };
+  return typeof obj.id === 'string' && obj.id ? obj.id : null;
+}
+
+function readToolResultId(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const obj = data as { toolUseId?: unknown };
+  return typeof obj.toolUseId === 'string' && obj.toolUseId
+    ? obj.toolUseId
+    : null;
+}
+
+function readToolResultIsError(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return false;
+  return (data as { isError?: unknown }).isError === true;
+}
+
 export function countNewHtmlArtifacts(events: readonly RunEventLike[]): number {
   if (!events || events.length === 0) return 0;
+
+  // First pass: collect tool_result records keyed by toolUseId so the
+  // second pass can resolve each tool_use's outcome without quadratic
+  // scanning. Default outcome for a tool_use with no matching result
+  // (run still streaming when this is called, or adapter swallowed
+  // the result) is "still in flight" — we treat that as NOT counting,
+  // since we can't confirm the artifact actually landed. The web-side
+  // `deriveFileOps` makes the same choice (status='running' for
+  // unmatched tool_use); aligning here keeps both pipelines in sync.
+  const resultByToolUseId = new Map<string, { isError: boolean }>();
+  for (const rec of events) {
+    if (rec?.event !== 'agent') continue;
+    const data = rec.data as { type?: string } | null | undefined;
+    if (data?.type !== 'tool_result') continue;
+    const id = readToolResultId(rec.data);
+    if (!id) continue;
+    resultByToolUseId.set(id, { isError: readToolResultIsError(rec.data) });
+  }
+
   const writtenPaths = new Set<string>();
   for (const rec of events) {
     if (rec?.event !== 'agent') continue;
@@ -60,6 +111,16 @@ export function countNewHtmlArtifacts(events: readonly RunEventLike[]): number {
     const path = extractToolFilePath(data.input);
     if (!path) continue;
     if (!isHtmlPath(path)) continue;
+    const toolUseId = readToolUseId(rec.data);
+    // No id: legacy / synthetic stream shapes that don't pair. Be
+    // conservative and skip; the dashboard would rather under-count
+    // than count attempts that may have failed silently.
+    if (!toolUseId) continue;
+    const outcome = resultByToolUseId.get(toolUseId);
+    // No matching result: tool still in flight at snapshot time, OR
+    // adapter never emitted one. Don't count either way.
+    if (!outcome) continue;
+    if (outcome.isError) continue;
     writtenPaths.add(path);
   }
   return writtenPaths.size;
