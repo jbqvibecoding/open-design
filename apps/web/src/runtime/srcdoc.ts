@@ -1386,7 +1386,45 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
     if (document.body && document.body.scrollWidth > document.body.clientWidth + 1) return document.body;
     return document.scrollingElement || document.documentElement;
   }
+  function viewportTransformTrack(list){
+    if (!list || !list.length) return null;
+    var parent = list[0].parentElement;
+    if (!parent || parent === document.body) return null;
+    for (var i=1; i<list.length; i++) {
+      if (list[i].parentElement !== parent) return null;
+    }
+    try {
+      var parentStyle = window.getComputedStyle(parent);
+      var firstStyle = window.getComputedStyle(list[0]);
+      var parentClasses = parent.classList;
+      var hasTrackName = parent.id === 'deck' ||
+        (parentClasses && (
+          parentClasses.contains('deck') ||
+          parentClasses.contains('deck-track') ||
+          parentClasses.contains('slides')
+        ));
+      var fixedFlexTrack = parentStyle.position === 'fixed' && parentStyle.display.indexOf('flex') >= 0;
+      var computedTrackWidth = parseFloat(parentStyle.width || '0');
+      var viewportSized = (parent.style.width || '').indexOf('vw') >= 0 ||
+        (list[0].style.width || '').indexOf('vw') >= 0 ||
+        (list[0].style.flex || '').indexOf('vw') >= 0 ||
+        (firstStyle.width || '').indexOf('vw') >= 0 ||
+        (firstStyle.flexBasis || '').indexOf('vw') >= 0 ||
+        (Number.isFinite(computedTrackWidth) && computedTrackWidth > window.innerWidth + 1);
+      return hasTrackName && fixedFlexTrack && viewportSized ? parent : null;
+    } catch (_) {
+      return null;
+    }
+  }
+  function syncViewportTransformTrack(i, list){
+    var track = viewportTransformTrack(list);
+    if (!track) return false;
+    if (!track.style.width) track.style.width = (list.length * 100) + 'vw';
+    track.style.transform = 'translateX(' + (-i * 100) + 'vw)';
+    return true;
+  }
   function isScrollDeck(){
+    if (viewportTransformTrack(slides())) return false;
     var sc = scroller();
     return !!(sc && sc.scrollWidth > sc.clientWidth + 1);
   }
@@ -1440,6 +1478,7 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
   }
   function canSetActive(list){
     if (findActiveByClass(list) >= 0) return true;
+    if (viewportTransformTrack(list)) return true;
     for (var i=0; i<list.length; i++) {
       if (list[i].style.display === 'none') return true;
       if (list[i].style.visibility === 'hidden') return true;
@@ -1486,6 +1525,7 @@ function injectDeckBridge(doc: string, initialSlideIndex = 0): string {
         list[k].style.visibility = k === target ? '' : 'hidden';
       }
     }
+    syncViewportTransformTrack(target, list);
     updateDeckChrome(target, list.length);
     report();
     return true;
