@@ -225,7 +225,7 @@ post-steps:
       APPROVER: ${{ github.triggering_actor }}
     run: |
       mkdir -p /tmp/agent-report
-      node --experimental-strip-types e2e/agent/extract-verdicts.ts \
+      node --experimental-strip-types e2e/scripts/agent-pr-explore-extract.ts \
         --input "${GH_AW_AGENT_OUTPUT_DIR}/agent_output.json" \
         --pr "$PR_NUMBER" \
         --head "$HEAD_SHA" \

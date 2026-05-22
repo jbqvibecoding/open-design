@@ -359,8 +359,8 @@ the pending-approval queue for the canceled run is discarded.
 |---|---|
 | `.github/workflows/agent-pr-explore.md` | `gh-aw` source workflow |
 | `.github/workflows/agent-pr-explore.lock.yml` | Compiled GitHub Actions YAML (committed for transparency and review) |
-| `e2e/agent/extract-verdicts.mjs` | Wrapper extracting STEP_DONE markers from the agent session into structured PR-comment markdown |
-| `e2e/agent/README.md` | Operator runbook |
+| `e2e/scripts/agent-pr-explore-extract.ts` | Wrapper extracting STEP_DONE markers from the agent session into structured PR-comment markdown. Allowlisted in `scripts/guard.ts`'s `allowedE2eScripts`. |
+| Operator runbook | Inlined in this spec as § Operator notes (lower down). |
 | Secret `ANTHROPIC_API_KEY` (v1 default); `CLAUDE_CODE_OAUTH_TOKEN` deferred to Phase 3 pending Security § resolution | LLM auth |
 
 ## Wrapper output contract
@@ -384,7 +384,7 @@ group is greedy `.+`. A title like `Product | Library dropdown shows
 expected children` parses correctly because the parser never splits
 past the second `|`.
 
-Constraints (machine-enforced by `e2e/agent/extract-verdicts.mjs`):
+Constraints (machine-enforced by `e2e/scripts/agent-pr-explore-extract.ts`):
 
 - `<step-id>` matches `^step-\d{2,}$`, monotonically increasing per
   session starting at `step-01`. The step-id field itself MUST NOT

@@ -21,6 +21,8 @@ const allowedE2eScripts = new Set([
   "e2e/scripts/playwright.ts",
   "e2e/scripts/release-smoke.ts",
   "e2e/scripts/visual-report.ts",
+  // PR Explore Agent — see specs/change/20260522-pr-explore-agent/
+  "e2e/scripts/agent-pr-explore-extract.ts",
 ]);
 
 type GuardCheck = {
