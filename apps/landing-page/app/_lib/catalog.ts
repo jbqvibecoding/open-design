@@ -290,9 +290,9 @@ export async function getSkillRecords(
 }
 
 /**
- * Filter helper for kind-specific catalog routes (`/skills/templates/`,
- * `/skills/instructions/`) and the split sections on `/skills/`. Caller
- * gets the records already sorted by the standard catalog rules.
+ * Filter helper for kind-specific catalog routes (`/plugins/templates/`,
+ * `/plugins/skills/`). Caller gets the records already sorted by the
+ * standard catalog rules.
  */
 export async function getSkillRecordsByKind(
   kind: SkillKind,

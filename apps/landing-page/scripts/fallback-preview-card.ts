@@ -391,3 +391,39 @@ export function renderFallbackCard(meta: SkillCardMeta, indexInCatalog: number):
 }
 
 export const FALLBACK_CARD_VIEWPORT = VIEWPORT;
+
+/**
+ * Lightweight wrapper for non-SKILL.md sources (notably the bundled
+ * plugin manifests under `plugins/_official/`). Skips the YAML
+ * parsing path and feeds whatever metadata the caller already has
+ * straight into the same card renderer.
+ *
+ * The card visual is identical to the SKILL.md path so the catalog
+ * reads as one publication regardless of where each entry's data
+ * came from.
+ */
+export interface ExternalCardMeta {
+  slug: string;
+  title: string;
+  description: string;
+  mode?: string;
+  category?: string;
+  attribution?: string;
+}
+
+export function renderCardFromExternal(
+  meta: ExternalCardMeta,
+  indexInSection: number,
+): string {
+  return renderFallbackCard(
+    {
+      slug: meta.slug,
+      displayName: meta.title || meta.slug,
+      description: meta.description,
+      mode: meta.mode,
+      category: meta.category,
+      attribution: meta.attribution,
+    },
+    indexInSection,
+  );
+}

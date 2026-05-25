@@ -131,6 +131,15 @@ body.sub-page {
   padding: 24px 0 28px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
+  /*
+   * When the user clicks an artifact-kind chip on a different
+   * /plugins/templates/<kind>/ page, the anchor `#filter-strip`
+   * lands here. The 96px margin keeps the sticky site nav from
+   * covering the chip rail and gives a breath of paper above the
+   * chips so the rail reads as a "still here" marker rather than
+   * snapping flush to the viewport edge.
+   */
+  scroll-margin-top: 96px;
 }
 .filter-group {
   display: grid;
@@ -177,6 +186,27 @@ body.sub-page {
 }
 .chip-link:hover {
   background: rgba(237, 111, 92, 0.06);
+}
+/*
+ * Active state for filter chips on the /plugins/templates/ rails. The
+ * chip pointing at the page the user is on swaps to a filled coral
+ * background so the rail keeps reading as a "you are here" marker
+ * rather than a row of identical buttons.
+ */
+.chip-link.is-active,
+.chip-link[aria-current='page'] {
+  background: var(--coral);
+  border-color: var(--coral);
+  color: #fff;
+}
+.chip-link.is-active .chip-num,
+.chip-link[aria-current='page'] .chip-num {
+  color: rgba(255, 255, 255, 0.75);
+}
+.chip-link.is-active:hover,
+.chip-link[aria-current='page']:hover {
+  background: var(--coral);
+  color: #fff;
 }
 .chip-num {
   color: var(--ink-mute);
