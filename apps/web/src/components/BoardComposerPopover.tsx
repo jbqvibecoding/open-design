@@ -133,7 +133,6 @@ export function BoardComposerPopover({
   onClose,
   onSaveComment,
   onSendBatch,
-  onRemove,
   onRemoveMember,
   onHoverMember,
   sending,
@@ -151,7 +150,6 @@ export function BoardComposerPopover({
   onClose: () => void;
   onSaveComment: () => void | Promise<void>;
   onSendBatch: () => void | Promise<void>;
-  onRemove: (commentId: string) => void | Promise<void>;
   onRemoveMember: (elementId: string) => void;
   onHoverMember?: (elementId: string | null) => void;
   sending: boolean;
@@ -241,16 +239,6 @@ export function BoardComposerPopover({
           >
             <Icon name="close" size={12} />
           </button>
-          {existing ? (
-            <button
-              type="button"
-              className="comment-popover-remove"
-              onClick={() => onRemove(existing.id)}
-              title={t('chat.comments.remove')}
-            >
-              {t('chat.comments.remove')}
-            </button>
-          ) : null}
         </div>
         <div className="comment-popover-actions-end">
           {target.selectionKind === 'pod' ? (

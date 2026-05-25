@@ -1677,6 +1677,14 @@ describe('FileViewer tweaks toolbar', () => {
     expect((await screen.findByTestId('comment-active-pin')).textContent).toBe('C');
     expect(screen.getByTestId('comment-saved-marker-pin-newer')).toBeTruthy();
     expect(screen.getByTestId('comment-saved-marker-pin-older')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('comment-saved-marker-pin-newer'));
+    await waitFor(() => {
+      const activeItem = document.querySelector('[data-comment-id="comment-newer"]');
+      expect(activeItem?.className).toContain('active');
+      expect(activeItem?.getAttribute('aria-current')).toBe('true');
+    });
+    expect(document.querySelector('[data-comment-id="comment-older"]')?.className).not.toContain('active');
   });
 
   it('does not preload non-open element comments into the picker composer', async () => {
@@ -1918,6 +1926,7 @@ describe('FileViewer tweaks toolbar', () => {
             },
           ]}
           selectedIds={new Set(['comment-1'])}
+          activeCommentId={null}
           collapsed={collapsed}
           onCollapsedChange={(next) => {
             onCollapseChange(next);

@@ -1912,6 +1912,7 @@ function commentDisplayLabel(comment: PreviewComment, t: TranslateFn): string {
 export function CommentSidePanel({
   comments,
   selectedIds,
+  activeCommentId,
   collapsed,
   onCollapsedChange,
   onClose,
@@ -1926,6 +1927,7 @@ export function CommentSidePanel({
 }: {
   comments: PreviewComment[];
   selectedIds: Set<string>;
+  activeCommentId: string | null;
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
   onClose: () => void;
@@ -1990,11 +1992,14 @@ export function CommentSidePanel({
           </div>
         ) : sorted.map((comment) => {
           const selected = visibleSelectedIds.has(comment.id);
+          const active = comment.id === activeCommentId;
           return (
             <div
               key={comment.id}
-              className={`comment-side-item${selected ? ' selected' : ''}`}
+              className={`comment-side-item${selected ? ' selected' : ''}${active ? ' active' : ''}`}
               data-testid="comment-side-item"
+              data-comment-id={comment.id}
+              aria-current={active ? 'true' : undefined}
             >
               <div className="comment-side-item-head">
                 <span className="comment-side-author">
@@ -2839,12 +2844,16 @@ function CommentPreviewOverlays({
               height: bounds.height,
             }}
             data-testid={`comment-saved-marker-${comment.elementId}`}
+            onClick={() => onOpenComment(comment, snapshot)}
           >
             <div className="comment-saved-outline" />
             <button
               type="button"
               className="comment-saved-pin"
-              onClick={() => onOpenComment(comment, snapshot)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenComment(comment, snapshot);
+              }}
               title={`${comment.elementId}: ${comment.note}`}
               aria-label={`Open comment for ${comment.elementId}`}
             >
@@ -5896,6 +5905,11 @@ function HtmlViewer({
       .sort((a, b) => b.createdAt - a.createdAt),
     [file.name, previewComments],
   );
+  const activeSideCommentId = activePreviewCommentId ?? (
+    activeCommentTarget
+      ? visibleSideComments.find((comment) => comment.elementId === activeCommentTarget.elementId)?.id ?? null
+      : null
+  );
   useEffect(() => {
     if (!boardMode || !activePreviewCommentId) return;
     const stillOpen = visibleSideComments.some((comment) => comment.id === activePreviewCommentId);
@@ -6057,11 +6071,6 @@ function HtmlViewer({
       onClose={clearBoardComposer}
       onSaveComment={savePersistentComment}
       onSendBatch={sendBoardBatch}
-      onRemove={async (commentId) => {
-        if (!onRemovePreviewComment) return;
-        await onRemovePreviewComment(commentId);
-        clearBoardComposer();
-      }}
       onRemoveMember={(elementId) => {
         setActiveCommentTarget((current) => {
           const { next, shouldClose } = applyPodMemberRemoval(current, elementId);
@@ -6081,6 +6090,7 @@ function HtmlViewer({
     <CommentSidePanel
       comments={visibleSideComments}
       selectedIds={selectedSideCommentIds}
+      activeCommentId={activeSideCommentId}
       collapsed={commentPortalHost ? false : commentSidePanelCollapsed}
       onCollapsedChange={setCommentSidePanelCollapsed}
       onClose={() => {
@@ -6817,6 +6827,10 @@ function HtmlViewer({
                 scale={overlayPreviewScale}
                 strokePoints={strokePoints}
                 onOpenComment={(comment, snapshot) => {
+                  setCommentPanelOpen(true);
+                  setCommentSidePanelCollapsed(false);
+                  setCommentCreateMode(true);
+                  setBoardMode(true);
                   setActiveCommentTarget(snapshot);
                   setHoveredCommentTarget(snapshot);
                   setActivePreviewCommentId(comment.id);
