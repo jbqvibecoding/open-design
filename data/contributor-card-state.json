@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-25T06:37:38.833Z",
+  "generatedAt": "2026-05-25T06:39:36.185Z",
   "contributors": {
     "1115052994": {
       "lastAnnouncedTier": "spark",
@@ -1440,8 +1440,8 @@
     },
     "amyshang-alt": {
       "lastAnnouncedTier": "spark",
-      "lastKnownScore": 20,
-      "lastCheckedAt": "2026-05-25T02:33:12.956Z",
+      "lastKnownScore": 25,
+      "lastCheckedAt": "2026-05-25T06:39:36.185Z",
       "scoreVersion": "weighted-v1",
       "lastAnnouncedAt": "2026-05-22T11:29:03.259Z"
     },
