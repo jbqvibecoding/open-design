@@ -124,32 +124,34 @@ describe('ManualEditPanel', () => {
     expect(sizeInput.value).toBe('32');
   });
 
-  it('increments normal rows and quad cells with normalized values', () => {
+  it('increments text typography rows with normalized values', () => {
     const onStyleChange = vi.fn();
     renderPanel({
       onStyleChange,
       styles: {
         ...emptyManualEditStyles(),
         fontSize: '32px',
-        opacity: '0.5',
-        paddingTop: '8px',
+        lineHeight: '1.4',
+        letterSpacing: '1px',
       },
     });
 
     const sizeIncrease = host.querySelector('button[aria-label="Size increase"]') as HTMLButtonElement | null;
-    const opacityIncrease = host.querySelector('button[aria-label="Opacity increase"]') as HTMLButtonElement | null;
-    const paddingTopDecrease = host.querySelector('.cc-quad button[aria-label="T decrease"]') as HTMLButtonElement | null;
-    if (!sizeIncrease || !opacityIncrease || !paddingTopDecrease) throw new Error('Stepper button not found');
+    const lineIncrease = host.querySelector('button[aria-label="Line increase"]') as HTMLButtonElement | null;
+    const trackingDecrease = host.querySelector('button[aria-label="Tracking decrease"]') as HTMLButtonElement | null;
+    if (!sizeIncrease || !lineIncrease || !trackingDecrease) throw new Error('Stepper button not found');
 
     act(() => {
       sizeIncrease.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
-      opacityIncrease.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
-      paddingTopDecrease.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+      lineIncrease.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+      trackingDecrease.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
     });
 
     expect(onStyleChange).toHaveBeenCalledWith('hero-title', { fontSize: '33px' }, 'Style: Hero Title');
-    expect(onStyleChange).toHaveBeenCalledWith('hero-title', { opacity: '0.6' }, 'Style: Hero Title');
-    expect(onStyleChange).toHaveBeenCalledWith('hero-title', { paddingTop: '7px' }, 'Style: Hero Title');
+    expect(onStyleChange).toHaveBeenCalledWith('hero-title', { lineHeight: '1.5' }, 'Style: Hero Title');
+    expect(onStyleChange).toHaveBeenCalledWith('hero-title', { letterSpacing: '0px' }, 'Style: Hero Title');
+    expect(host.textContent).not.toContain('Opacity');
+    expect(host.textContent).not.toContain('Padding');
   });
 
   it('does not persist an unchanged target style when the inspector opens', () => {
@@ -359,7 +361,7 @@ describe('ManualEditPanel', () => {
     );
   });
 
-  it('renders layout as inactive for non-layout single targets', () => {
+  it('hides layout controls for non-layout single targets', () => {
     const onStyleChange = vi.fn();
     renderPanel({
       onStyleChange,
@@ -370,15 +372,10 @@ describe('ManualEditPanel', () => {
       },
     });
 
-    const layoutSection = sectionByTitle('LAYOUT');
-    expect(layoutSection.classList.contains('cc-section-inactive')).toBe(true);
-    expect(layoutSection.textContent).toContain('Select a container or group to edit layout.');
-    const gapInput = layoutSection.querySelector('input') as HTMLInputElement | null;
-    const directionSelect = layoutSection.querySelector('select') as HTMLSelectElement | null;
-    if (!gapInput || !directionSelect) throw new Error('Layout controls not found');
-
-    expect(gapInput.disabled).toBe(true);
-    expect(directionSelect.disabled).toBe(true);
+    const layoutSection = Array.from(host.querySelectorAll('.cc-section')).find((section) => (
+      section.textContent?.includes('LAYOUT')
+    ));
+    expect(layoutSection).toBeUndefined();
     expect(normalizeManualEditStyles({ gap: '12', flexDirection: 'column' }, { layoutEnabled: false })).toEqual({
       ok: true,
       styles: {},

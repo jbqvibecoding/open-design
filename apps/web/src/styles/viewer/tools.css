@@ -749,6 +749,23 @@
 .share-menu-item:disabled { opacity: 0.45; cursor: not-allowed; }
 .share-menu-icon { flex: 0 0 auto; width: 18px; text-align: center; font-size: 13px; }
 .share-menu-divider { height: 1px; background: var(--border); margin: 4px 6px; }
+.share-menu-subitem {
+  padding-left: 18px;
+}
+.share-menu-section-label {
+  padding: 8px 10px 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.share-menu-subsection-label {
+  padding: 6px 10px 2px 18px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
 
 .button-like {
   display: inline-flex;

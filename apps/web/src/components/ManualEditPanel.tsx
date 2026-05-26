@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useT } from '../i18n';
 import { emptyManualEditStyles, type ManualEditHistoryEntry, type ManualEditPatch, type ManualEditStyles, type ManualEditTarget } from '../edit-mode/types';
 import { Icon } from './Icon';
@@ -36,6 +36,7 @@ export function ManualEditPanel({
   onApplyPatch,
   onPickImage,
   pageStylesEnabled = true,
+  floatingStyle,
 }: {
   targets: ManualEditTarget[];
   selectedTarget: ManualEditTarget | null;
@@ -52,6 +53,7 @@ export function ManualEditPanel({
   onInvalidStyle?: (id: string, keys: Array<keyof ManualEditStyles>) => void;
   onApplyPatch: (patch: ManualEditPatch, label: string) => void;
   onPickImage?: (file: File) => Promise<string | null>;
+  floatingStyle?: CSSProperties;
   onError: (message: string) => void;
   onClearSelection: () => void;
   onExit?: () => void;
@@ -86,7 +88,10 @@ export function ManualEditPanel({
   };
 
   return (
-    <aside className="manual-edit-right">
+    <aside
+      className={`manual-edit-right${floatingStyle ? ' manual-edit-floating' : ''}`}
+      style={floatingStyle}
+    >
       <section className="manual-edit-modal cc-panel">
         <div className="manual-edit-titlebar">
           <span>Edit</span>
@@ -104,6 +109,7 @@ export function ManualEditPanel({
         </div>
         {targetForInspector ? (
           <StyleInspector
+            targetKind={targetForInspector.kind}
             styles={draft.styles}
             layoutEnabled={targetForInspector.isLayoutContainer}
             onClearSelection={onClearSelection}
@@ -393,14 +399,19 @@ function styleLabel(key: keyof ManualEditStyles): string {
 }
 
 function StyleInspector({
-  styles, layoutEnabled, onClearSelection, onChange,
+  targetKind, styles, layoutEnabled, onClearSelection, onChange,
 }: {
+  targetKind: ManualEditTarget['kind'];
   styles: ManualEditStyles;
   layoutEnabled: boolean;
   onClearSelection: () => void;
   onChange: (key: keyof ManualEditStyles, value: string) => void;
 }) {
   const u = (key: keyof ManualEditStyles, value: string) => onChange(key, value);
+  const showTypography = targetKind === 'text' || targetKind === 'link' || targetKind === 'token';
+  const showSize = targetKind !== 'text' && targetKind !== 'link' && targetKind !== 'token';
+  const showLayout = layoutEnabled;
+  const showBox = targetKind === 'container' || targetKind === 'image' || targetKind === 'token';
 
   return (
     <div className="cc-inspector">
@@ -409,43 +420,47 @@ function StyleInspector({
           Page
         </button>
       </div>
-      <Section title="TYPOGRAPHY">
-        <FontRow value={styles.fontFamily} onChange={(v) => u('fontFamily', v)} />
-        <PairRow>
-          <UnitRow label="Size" value={styles.fontSize} onChange={(v) => u('fontSize', v)} unit="px" autoUnit />
-          <DropdownRow label="Weight" value={styles.fontWeight} onChange={(v) => u('fontWeight', v)} options={WEIGHT_OPTS} />
-        </PairRow>
-        <PairRow>
-          <ColorRow label="Color" value={styles.color} onChange={(v) => u('color', v)} />
-          <DropdownRow label="Align" value={styles.textAlign} onChange={(v) => u('textAlign', v)} options={ALIGN_OPTS} />
-        </PairRow>
-        <PairRow>
-          <UnitRow label="Line" value={styles.lineHeight} onChange={(v) => u('lineHeight', v)} unit="" />
-          <UnitRow label="Tracking" value={styles.letterSpacing} onChange={(v) => u('letterSpacing', v)} unit="px" autoUnit />
-        </PairRow>
-      </Section>
+      {showTypography ? (
+        <Section title="TYPOGRAPHY">
+          <FontRow value={styles.fontFamily} onChange={(v) => u('fontFamily', v)} />
+          <PairRow>
+            <UnitRow label="Size" value={styles.fontSize} onChange={(v) => u('fontSize', v)} unit="px" autoUnit />
+            <DropdownRow label="Weight" value={styles.fontWeight} onChange={(v) => u('fontWeight', v)} options={WEIGHT_OPTS} />
+          </PairRow>
+          <PairRow>
+            <ColorRow label="Color" value={styles.color} onChange={(v) => u('color', v)} />
+            <DropdownRow label="Align" value={styles.textAlign} onChange={(v) => u('textAlign', v)} options={ALIGN_OPTS} />
+          </PairRow>
+          <PairRow>
+            <UnitRow label="Line" value={styles.lineHeight} onChange={(v) => u('lineHeight', v)} unit="" />
+            <UnitRow label="Tracking" value={styles.letterSpacing} onChange={(v) => u('letterSpacing', v)} unit="px" autoUnit />
+          </PairRow>
+        </Section>
+      ) : null}
 
-      <Section title="SIZE">
-        <PairRow>
-          <UnitRow label="Width" value={styles.width} onChange={(v) => u('width', v)} unit="px" autoUnit />
-          <UnitRow label="Height" value={styles.height} onChange={(v) => u('height', v)} unit="px" autoUnit />
-        </PairRow>
-      </Section>
+      {showSize ? (
+        <Section title="SIZE">
+          <PairRow>
+            <UnitRow label="Width" value={styles.width} onChange={(v) => u('width', v)} unit="px" autoUnit />
+            <UnitRow label="Height" value={styles.height} onChange={(v) => u('height', v)} unit="px" autoUnit />
+          </PairRow>
+        </Section>
+      ) : null}
 
-      <Section title="LAYOUT" inactive={!layoutEnabled}>
-        {!layoutEnabled ? (
-          <p className="cc-section-hint">Select a container or group to edit layout.</p>
-        ) : null}
-        <PairRow>
-          <UnitRow label="Gap" value={styles.gap} onChange={(v) => u('gap', v)} unit="px" autoUnit disabled={!layoutEnabled} />
-          <DropdownRow label="Direction" value={styles.flexDirection} onChange={(v) => u('flexDirection', v)} options={DIRECTION_OPTS} disabled={!layoutEnabled} />
-        </PairRow>
-        <PairRow>
-          <DropdownRow label="Justify" value={styles.justifyContent} onChange={(v) => u('justifyContent', v)} options={JUSTIFY_OPTS} disabled={!layoutEnabled} />
-          <DropdownRow label="Align" value={styles.alignItems} onChange={(v) => u('alignItems', v)} options={ITEMS_OPTS} disabled={!layoutEnabled} />
-        </PairRow>
-      </Section>
+      {showLayout ? (
+        <Section title="LAYOUT">
+          <PairRow>
+            <UnitRow label="Gap" value={styles.gap} onChange={(v) => u('gap', v)} unit="px" autoUnit />
+            <DropdownRow label="Direction" value={styles.flexDirection} onChange={(v) => u('flexDirection', v)} options={DIRECTION_OPTS} />
+          </PairRow>
+          <PairRow>
+            <DropdownRow label="Justify" value={styles.justifyContent} onChange={(v) => u('justifyContent', v)} options={JUSTIFY_OPTS} />
+            <DropdownRow label="Align" value={styles.alignItems} onChange={(v) => u('alignItems', v)} options={ITEMS_OPTS} />
+          </PairRow>
+        </Section>
+      ) : null}
 
+      {showBox ? (
       <Section title="BOX">
         <PairRow>
           <ColorRow label="Fill" value={styles.backgroundColor} onChange={(v) => u('backgroundColor', v)} />
@@ -470,6 +485,7 @@ function StyleInspector({
         </PairRow>
         <UnitRow label="Radius" value={styles.borderRadius} onChange={(v) => u('borderRadius', v)} unit="px" autoUnit />
       </Section>
+      ) : null}
     </div>
   );
 }

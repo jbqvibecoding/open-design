@@ -1266,8 +1266,8 @@ describe('FileViewer SVG artifacts', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /share/i }));
 
-    expect(await screen.findByRole('menuitem', { name: /Copy link · Vercel/i })).toBeTruthy();
-    const cloudflareCopy = await screen.findByRole('menuitem', { name: /Copy link · Cloudflare Pages/i });
+    expect(await screen.findByRole('menuitem', { name: /Copy Vercel link/i })).toBeTruthy();
+    const cloudflareCopy = await screen.findByRole('menuitem', { name: /Copy Cloudflare link/i });
     fireEvent.click(cloudflareCopy);
 
     expect(writeText).toHaveBeenCalledWith('https://cloudflare.pages.dev');
@@ -1313,8 +1313,8 @@ describe('FileViewer SVG artifacts', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /share/i }));
 
-    expect(await screen.findByRole('menuitem', { name: /Copy link · Cloudflare Pages/i })).toBeTruthy();
-    expect(screen.queryByRole('menuitem', { name: /Copy link · Vercel/i })).toBeNull();
+    expect(await screen.findByRole('menuitem', { name: /Copy Cloudflare link/i })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: /Copy Vercel link/i })).toBeNull();
   });
 
   it('renders unsafe SVG source as escaped text instead of executable markup', () => {
@@ -1453,11 +1453,10 @@ describe('FileViewer tweaks toolbar', () => {
     expect(screen.queryByPlaceholderText('Add a note for this annotation')).toBeNull();
 
     fireEvent.click(screen.getByTestId('screenshot-capture-toggle'));
-    expect(screen.getByPlaceholderText('Add a note for this annotation')).toBeTruthy();
-    expect(screen.queryByRole('status')).toBeNull();
-    expect(screen.getByTestId('screenshot-capture-toggle').getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByPlaceholderText('Add a note for this annotation')).toBeNull();
+    expect(screen.getByRole('status').textContent).toContain('Copying screenshot');
+    expect(screen.getByTestId('screenshot-capture-toggle').getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByTestId('draw-overlay-toggle').getAttribute('aria-pressed')).toBe('false');
-    expect(screen.getByRole('button', { name: 'Send' })).toHaveProperty('disabled', false);
   });
 
   it('keeps the Draw bar open after queueing an annotation', () => {

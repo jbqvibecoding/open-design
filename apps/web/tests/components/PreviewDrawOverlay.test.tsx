@@ -118,7 +118,7 @@ describe('PreviewDrawOverlay', () => {
       </PreviewDrawOverlay>,
     );
 
-    fireEvent.click(getByRole('button', { name: 'Close draw toolbar' }));
+    fireEvent.click(getByRole('button', { name: 'Close' }));
 
     expect(onActiveChange).toHaveBeenCalledWith(false);
   });

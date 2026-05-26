@@ -168,13 +168,28 @@ function injectSrcdocTransportActivationBridge(doc: string): string {
 
 function injectSnapshotBridge(doc: string): string {
   const script = `<script data-od-snapshot-bridge>(function(){
+  var SNAPSHOT_STYLE_PROPS = [
+    'display','position','box-sizing','width','height','min-width','max-width','min-height','max-height',
+    'margin','margin-top','margin-right','margin-bottom','margin-left',
+    'padding','padding-top','padding-right','padding-bottom','padding-left',
+    'border','border-top','border-right','border-bottom','border-left','border-radius',
+    'font','font-family','font-size','font-weight','font-style','line-height','letter-spacing',
+    'color','background-color','opacity','transform','transform-origin','overflow','overflow-x','overflow-y',
+    'white-space','text-align','vertical-align','object-fit','object-position',
+    'flex','flex-direction','flex-wrap','flex-grow','flex-shrink','flex-basis',
+    'grid','grid-template-columns','grid-template-rows','grid-column','grid-row',
+    'gap','row-gap','column-gap','align-items','align-content','align-self',
+    'justify-items','justify-content','justify-self','inset','top','right','bottom','left',
+    'z-index','box-shadow','text-shadow'
+  ];
   function copyComputedStyle(source, target){
     if (!source || !target || source.nodeType !== 1 || target.nodeType !== 1) return;
     var computed = window.getComputedStyle(source);
     var style = target.getAttribute('style') || '';
-    for (var i = 0; i < computed.length; i++){
-      var prop = computed[i];
-      style += prop + ':' + computed.getPropertyValue(prop) + ';';
+    for (var i = 0; i < SNAPSHOT_STYLE_PROPS.length; i++){
+      var prop = SNAPSHOT_STYLE_PROPS[i];
+      var value = computed.getPropertyValue(prop);
+      if (value) style += prop + ':' + value + ';';
     }
     target.setAttribute('style', style);
   }
@@ -196,7 +211,7 @@ function injectSnapshotBridge(doc: string): string {
     syncElementState(originalRoot, cloneRoot);
     var originals = originalRoot.querySelectorAll('*');
     var clones = cloneRoot.querySelectorAll('*');
-    var count = Math.min(originals.length, clones.length);
+    var count = Math.min(originals.length, clones.length, 3500);
     for (var i = 0; i < count; i++){
       copyComputedStyle(originals[i], clones[i]);
       syncElementState(originals[i], clones[i]);
@@ -230,6 +245,10 @@ function injectSnapshotBridge(doc: string): string {
       html +
       '</foreignObject></svg>';
     var img = new Image();
+    var objectUrl = null;
+    function cleanup(){
+      if (objectUrl && typeof URL !== 'undefined' && URL.revokeObjectURL) URL.revokeObjectURL(objectUrl);
+    }
     img.onload = function(){
       try {
         var canvas = document.createElement('canvas');
@@ -239,15 +258,28 @@ function injectSnapshotBridge(doc: string): string {
         if (!ctx) throw new Error('no 2d context');
         ctx.scale(dpr, dpr);
         ctx.drawImage(img, 0, 0, w, h);
+        cleanup();
         window.parent.postMessage({ type: 'od:snapshot:result', id: id, dataUrl: canvas.toDataURL('image/png'), w: canvas.width, h: canvas.height }, '*');
       } catch (err) {
+        cleanup();
         window.parent.postMessage({ type: 'od:snapshot:result', id: id, error: String(err && err.message || err) }, '*');
       }
     };
     img.onerror = function(){
+      cleanup();
       window.parent.postMessage({ type: 'od:snapshot:result', id: id, error: 'snapshot image failed' }, '*');
     };
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    if (typeof URL !== 'undefined' && URL.createObjectURL && typeof Blob !== 'undefined') {
+      objectUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+      img.src = objectUrl;
+    } else {
+      var encoded = encodeURIComponent(svg);
+      if (encoded.length > 1500000) {
+        window.parent.postMessage({ type: 'od:snapshot:result', id: id, error: 'snapshot too large' }, '*');
+        return;
+      }
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encoded;
+    }
   }
   window.addEventListener('message', function(ev){
     var data = ev && ev.data;
@@ -1010,7 +1042,7 @@ function meaningfulDomFallbackTarget(el) {
 
   return true;
 }
-  function targetFrom(el, allowDomFallback, clickedEl){
+  function targetFrom(el, allowDomFallback, clickedEl, clickPoint){
     var id = el.getAttribute('data-od-id') || el.getAttribute('data-screen-label');
     var selector = annotatedSelectorFor(el);
     if (!id && allowDomFallback && meaningfulDomFallbackTarget(el)) {
@@ -1023,16 +1055,23 @@ function meaningfulDomFallbackTarget(el) {
     var cls = typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\\s+/).slice(0,2).join('.') : '';
     var html = '';
     try { html = (el.outerHTML || '').replace(/\\s+/g, ' ').match(/^<[^>]+>/)?.[0] || ''; } catch (_) {}
+    var position = { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) };
+    if (clickPoint) {
+      position = { x: Math.round(clickPoint.x), y: Math.round(clickPoint.y), width: 1, height: 1 };
+    }
     var payload = {
       type: 'od:comment-target',
       elementId: id,
       selector: selector,
       label: tag + cls,
       text: (el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 160),
-      position: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+      position: position,
       htmlHint: html.slice(0, 180),
       style: styleSnapshot(el)
     };
+    if (clickPoint) {
+      payload.hoverPoint = { x: Math.round(clickPoint.x), y: Math.round(clickPoint.y) };
+    }
     if (clickedEl && clickedEl !== el) {
       var clickedTag = clickedEl.tagName ? clickedEl.tagName.toLowerCase() : 'element';
       var clickedCls = typeof clickedEl.className === 'string' && clickedEl.className.trim() ? '.' + clickedEl.className.trim().split(/\\s+/).slice(0,2).join('.') : '';
@@ -1261,7 +1300,9 @@ function meaningfulDomFallbackTarget(el) {
     if (result) {
       ev.preventDefault();
       ev.stopPropagation();
-      var payload = targetFrom(result.target, commentEnabled && mode === 'picker' && !inspectEnabled, result.clicked);
+      var commentPickerClick = commentEnabled && mode === 'picker' && !inspectEnabled;
+      var clickPoint = commentPickerClick ? { x: ev.clientX, y: ev.clientY } : null;
+      var payload = targetFrom(result.target, commentPickerClick, result.clicked, clickPoint);
       if (payload) window.parent.postMessage(payload, '*');
       return;
     }
@@ -1296,6 +1337,7 @@ function meaningfulDomFallbackTarget(el) {
       label: 'pin',
       text: '',
       position: { x: pinX - 12, y: pinY - 12, width: 24, height: 24 },
+      hoverPoint: { x: pinX, y: pinY },
       htmlHint: '',
       style: null,
       freePin: true

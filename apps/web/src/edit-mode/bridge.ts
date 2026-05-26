@@ -185,6 +185,14 @@ export function buildManualEditBridge(enabled: boolean): string {
     if (!enabled) return;
     window.parent.postMessage({ type: 'od-edit-targets', targets: allTargets() }, '*');
   }
+  var lastHoverId = null;
+  function postHoverTarget(el){
+    if (!enabled || !el) return;
+    var id = stableId(el);
+    if (id === lastHoverId) return;
+    lastHoverId = id;
+    window.parent.postMessage({ type: 'od-edit-hover', target: targetFrom(el, true) }, '*');
+  }
   function clearSelectedTarget(){
     var selected = document.querySelectorAll('[data-od-edit-selected]');
     for (var i = 0; i < selected.length; i++) selected[i].removeAttribute('data-od-edit-selected');
@@ -341,16 +349,23 @@ export function buildManualEditBridge(enabled: boolean): string {
   document.addEventListener('click', function(ev){
     if (!enabled) return;
     if (ev.target && ev.target.closest && ev.target.closest('[data-od-editing="true"]')) return;
-    var el = closestTarget(ev);
-    if (!el) return;
     ev.preventDefault();
     ev.stopPropagation();
+    var el = closestTarget(ev);
+    if (!el) return;
     var kind = inferKind(el);
     if (kind === 'text' || kind === 'link') {
       makeEditable(el, ev);
       return;
     }
     window.parent.postMessage({ type: 'od-edit-select', target: targetFrom(el, true) }, '*');
+  }, true);
+  document.addEventListener('pointerover', function(ev){
+    if (!enabled) return;
+    if (ev.target && ev.target.closest && ev.target.closest('[data-od-editing="true"]')) return;
+    var el = closestTarget(ev);
+    if (!el) return;
+    postHoverTarget(el);
   }, true);
   window.addEventListener('resize', postTargets);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', postTargets);

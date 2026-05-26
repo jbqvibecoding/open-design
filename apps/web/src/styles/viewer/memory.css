@@ -656,6 +656,12 @@
   overflow: hidden;
   z-index: 30;
 }
+.manual-edit-workspace > .manual-edit-right.manual-edit-floating {
+  right: auto;
+  bottom: auto;
+  overflow: visible;
+  pointer-events: auto;
+}
 
 /* Claude Code-style edit inspector panel. */
 .cc-panel { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; overflow: auto; background: var(--bg-panel); }
@@ -924,6 +930,21 @@
   overscroll-behavior: contain;
   padding-bottom: 72px;
   scrollbar-gutter: stable;
+}
+.manual-edit-floating .manual-edit-modal.cc-panel {
+  max-height: inherit;
+  padding-bottom: 10px;
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+}
+.manual-edit-floating .manual-edit-titlebar {
+  min-height: 42px;
+  padding: 10px 12px 4px;
+}
+.manual-edit-floating .manual-edit-titlebar-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
 }
 
 .manual-edit-titlebar {
