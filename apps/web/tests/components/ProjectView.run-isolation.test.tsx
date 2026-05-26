@@ -153,11 +153,13 @@ vi.mock('../../src/components/ChatPane', () => ({
     conversations,
     streaming,
     sendDisabled,
+    queuedItems,
     previewComments,
     attachedComments,
     onAttachComment,
     onSelectConversation,
     onSend,
+    onSendQueuedNow,
     onNewConversation,
     error,
   }: {
@@ -165,12 +167,14 @@ vi.mock('../../src/components/ChatPane', () => ({
     conversations: Conversation[];
     streaming: boolean;
     sendDisabled?: boolean;
+    queuedItems?: Array<{ id: string; prompt: string }>;
     previewComments?: PreviewComment[];
     attachedComments?: PreviewComment[];
     error: string | null;
     onAttachComment?: (comment: PreviewComment) => void;
     onSelectConversation: (id: string) => void;
     onSend: (prompt: string, attachments: unknown[], commentAttachments: unknown[]) => void;
+    onSendQueuedNow?: (id: string) => void;
     onNewConversation: () => void;
   }) => {
     const attached = attachedComments ?? [];
@@ -180,6 +184,16 @@ vi.mock('../../src/components/ChatPane', () => ({
         <output data-testid="streaming-state">{streaming ? 'streaming' : 'idle'}</output>
         <output data-testid="chat-error">{error}</output>
         <output data-testid="attached-comment-count">{attached.length}</output>
+        {queuedItems?.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            data-testid={`send-queued-${index}`}
+            onClick={() => onSendQueuedNow?.(item.id)}
+          >
+            {item.prompt}
+          </button>
+        ))}
         {conversations.map((conversation) => (
           <button
             key={conversation.id}
@@ -236,6 +250,33 @@ vi.mock('../../src/components/ChatPane', () => ({
           disabled={sendDisabled}
         >
           send
+        </button>
+        <button
+          type="button"
+          data-testid="send-message-alt"
+          onClick={() =>
+            onSend(
+              'hello from c',
+              [],
+              attached.map((comment, index) => ({
+                id: comment.id,
+                order: index + 1,
+                filePath: comment.filePath,
+                elementId: comment.elementId,
+                selector: comment.selector,
+                label: comment.label,
+                comment: comment.note,
+                currentText: comment.text,
+                pagePosition: comment.position,
+                htmlHint: comment.htmlHint,
+                selectionKind: comment.selectionKind ?? 'element',
+                source: 'saved-comment',
+              })),
+            )
+          }
+          disabled={sendDisabled}
+        >
+          send alt
         </button>
         <button type="button" data-testid="new-conversation" onClick={onNewConversation}>
           new
@@ -516,7 +557,6 @@ describe('ProjectView conversation run isolation', () => {
       projectId: 'project-1',
     }));
   });
-
   it('detaches saved comment attachments after queueing them for a busy conversation', async () => {
     fetchPreviewComments.mockResolvedValue([previewComment]);
 
@@ -578,6 +618,40 @@ describe('ProjectView conversation run isolation', () => {
     );
   });
 
+  it('does not overlap active runs when send-now is clicked for a queued item', async () => {
+    let finishReattach: (() => void) | null = null;
+    let reattachHandlers: { onDone: () => void } | null = null;
+    reattachDaemonRun.mockImplementation(async (input: unknown) => {
+      reattachHandlers = (input as { handlers: { onDone: () => void } }).handlers;
+      return new Promise<void>((resolve) => {
+        finishReattach = resolve;
+      });
+    });
+
+    renderProjectView();
+
+    await waitFor(() => expect(screen.getByTestId('active-conversation').textContent).toBe('conv-a'));
+    await waitFor(() => expect(screen.getByTestId('streaming-state').textContent).toBe('streaming'));
+
+    fireEvent.click(screen.getByTestId('send-message'));
+    fireEvent.click(screen.getByTestId('send-message-alt'));
+
+    await waitFor(() => expect(screen.getByTestId('send-queued-1')).toBeTruthy());
+    fireEvent.click(screen.getByTestId('send-queued-1'));
+
+    expect(streamViaDaemon).not.toHaveBeenCalled();
+
+    await act(async () => {
+      reattachHandlers?.onDone();
+      finishReattach?.();
+    });
+
+    await waitFor(() => expect(streamViaDaemon).toHaveBeenCalledTimes(1));
+    const payload = streamViaDaemon.mock.calls[0]?.[0] as {
+      history?: Array<{ role: string; content: string }>;
+    };
+    expect(payload.history?.at(-1)).toMatchObject({ role: 'user', content: 'hello from c' });
+  });
   it('surfaces conversation message load errors and keeps sends disabled until messages load', async () => {
     let conversationBLoadAttempts = 0;
     listMessages.mockImplementation(async (_projectId: string, conversationId: string) => {

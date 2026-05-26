@@ -1708,6 +1708,14 @@ export interface Dict {
   'chat.linkedFolderNotFound': string;
   'chat.linkedFolderAlready': string;
   'chat.linkedFolderPickError': string;
+  'chat.queuedHeader': string;
+  'chat.queuedToSend': string;
+  'chat.queuedEditQueuedTaskAria': string;
+  'chat.queuedSave': string;
+  'chat.queuedCancel': string;
+  'chat.queuedEdit': string;
+  'chat.queuedMore': string;
+  'chat.queuedFollowUpFallback': string;
   'chat.send': string;
   'chat.stop': string;
   'chat.removeAria': string;

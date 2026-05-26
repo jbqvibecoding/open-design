@@ -219,6 +219,8 @@ interface Props {
   onTouchProject: () => void;
   onProjectChange: (next: Project) => void;
   onProjectsRefresh: () => void;
+  onChangeDefaultDesignSystem?: (designSystemId: string | null) => void;
+  onDesignSystemsRefresh?: () => Promise<void> | void;
 }
 
 interface QueuedChatSend {
@@ -227,7 +229,7 @@ interface QueuedChatSend {
   prompt: string;
   attachments: ChatAttachment[];
   commentAttachments: ChatCommentAttachment[];
-  meta?: ChatSendMeta;
+  meta?: ProjectChatSendMeta;
   createdAt: number;
 }
 
@@ -497,6 +499,8 @@ export function ProjectView({
   onTouchProject,
   onProjectChange,
   onProjectsRefresh,
+  onChangeDefaultDesignSystem,
+  onDesignSystemsRefresh,
 }: Props) {
   const { locale, t } = useI18n();
   const analytics = useAnalytics();
@@ -2157,6 +2161,22 @@ export function ProjectView({
     setQueuedChatSends(next);
   }, []);
 
+  const updateQueuedChatSend = useCallback((id: string, prompt: string) => {
+    const next = queuedChatSendsRef.current.map((item) =>
+      item.id === id ? { ...item, prompt } : item,
+    );
+    queuedChatSendsRef.current = next;
+    setQueuedChatSends(next);
+  }, []);
+
+  const prioritizeQueuedChatSend = useCallback((id: string) => {
+    const item = queuedChatSendsRef.current.find((candidate) => candidate.id === id);
+    if (!item) return;
+    const next = [item, ...queuedChatSendsRef.current.filter((candidate) => candidate.id !== id)];
+    queuedChatSendsRef.current = next;
+    setQueuedChatSends(next);
+  }, []);
+
   const handleSend = useCallback(
     async (
       prompt: string,
@@ -2832,17 +2852,13 @@ export function ProjectView({
     ],
   );
 
-  const handleRetry = useCallback(
-    (assistantMessage: ChatMessage) => {
-      if (currentConversationActionDisabled) return;
-      void handleSend('', [], [], { retryOfAssistantId: assistantMessage.id });
-    },
-    [currentConversationActionDisabled, handleSend],
-  );
-
   const sendQueuedChatSendNow = useCallback((id: string) => {
     const item = queuedChatSendsRef.current.find((candidate) => candidate.id === id);
     if (!item) return;
+    if (currentConversationBusy) {
+      prioritizeQueuedChatSend(id);
+      return;
+    }
     removeQueuedChatSend(id);
     void handleSend(
       item.prompt,
@@ -2852,7 +2868,7 @@ export function ProjectView({
       undefined,
       { bypassQueue: true },
     );
-  }, [handleSend, removeQueuedChatSend]);
+  }, [currentConversationBusy, handleSend, prioritizeQueuedChatSend, removeQueuedChatSend]);
 
   useEffect(() => {
     if (!activeConversationId) return;
@@ -2876,6 +2892,14 @@ export function ProjectView({
     handleSend,
     removeQueuedChatSend,
   ]);
+
+  const handleRetry = useCallback(
+    (assistantMessage: ChatMessage) => {
+      if (currentConversationActionDisabled) return;
+      void handleSend('', [], [], { retryOfAssistantId: assistantMessage.id });
+    },
+    [currentConversationActionDisabled, handleSend],
+  );
 
   useEffect(() => {
     if (!autoAuditRepairSeed) return;
@@ -4285,6 +4309,7 @@ export function ProjectView({
               onRetry={handleRetry}
               onStop={handleStop}
               onRemoveQueuedSend={removeQueuedChatSend}
+              onUpdateQueuedSend={updateQueuedChatSend}
               onSendQueuedNow={sendQueuedChatSendNow}
               onRequestOpenFile={requestOpenFile}
               onRequestPluginFolderAgentAction={handlePluginFolderAgentAction}
@@ -4382,6 +4407,9 @@ export function ProjectView({
           focusMode={workspaceFocused}
           onFocusModeChange={setWorkspaceFocused}
           designSystemProject={designSystemProject}
+          defaultDesignSystemId={config.designSystemId}
+          onSetDefaultDesignSystem={onChangeDefaultDesignSystem}
+          onDesignSystemsRefresh={onDesignSystemsRefresh}
           onDesignSystemNeedsWork={sendDesignSystemFeedback}
           designSystemReview={project.metadata?.designSystemReview}
           onDesignSystemReviewDecision={persistDesignSystemReviewDecision}

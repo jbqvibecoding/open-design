@@ -223,4 +223,33 @@ describe('todo event helpers', () => {
       { content: 'Self-check', status: 'pending', activeForm: undefined },
     ]);
   });
+
+  it('marks update_plan items as stopped when a terminal run ends with stale progress', () => {
+    const input = latestTodoWriteInputForPinnedCard([
+      {
+        runStatus: 'succeeded',
+        endedAt: 3_000,
+        events: [
+          {
+            kind: 'tool_use',
+            id: 'plan-1',
+            name: 'update_plan',
+            input: {
+              plan: [
+                { step: 'Inspect chat rendering', status: 'completed' },
+                { step: 'Add annotation card', status: 'in_progress' },
+                { step: 'Run focused tests', status: 'pending' },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    expect(parseTodoWriteInput(input)).toEqual([
+      { content: 'Inspect chat rendering', status: 'completed', activeForm: undefined },
+      { content: 'Add annotation card', status: 'stopped', activeForm: undefined },
+      { content: 'Run focused tests', status: 'pending', activeForm: undefined },
+    ]);
+  });
 });

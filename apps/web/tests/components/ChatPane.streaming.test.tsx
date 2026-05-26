@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { forwardRef, useImperativeHandle } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatPane, retryableAssistantMessage } from '../../src/components/ChatPane';
 import { DESIGN_SYSTEM_WORKSPACE_PROMPT_PREFIX } from '../../src/design-system-auto-prompt';
@@ -15,13 +15,24 @@ const composerMocks = vi.hoisted(() => ({
   setDraft: vi.fn(),
 }));
 
+const translations: Record<string, string> = {
+  'chat.queuedHeader': 'Queued',
+  'chat.queuedToSend': 'to Send',
+  'chat.queuedEditQueuedTaskAria': 'Edit queued task',
+  'chat.queuedSave': 'Save',
+  'chat.queuedCancel': 'Cancel',
+  'chat.queuedEdit': 'Edit',
+  'chat.queuedMore': 'more queued',
+  'chat.queuedFollowUpFallback': 'Queued follow-up',
+};
+
 vi.mock('../../src/i18n', () => ({
   useI18n: () => ({
     locale: 'en',
     setLocale: () => undefined,
-    t: (key: string) => key,
+    t: (key: string) => translations[key] ?? key,
   }),
-  useT: () => (key: string) => key,
+  useT: () => (key: string) => translations[key] ?? key,
 }));
 
 vi.mock('../../src/components/AssistantMessage', () => ({
@@ -41,9 +52,48 @@ vi.mock('../../src/components/ChatComposer', () => ({
   }),
 }));
 
+class MockResizeObserver {
+  static instances: MockResizeObserver[] = [];
+
+  callback: ResizeObserverCallback;
+  observed = new Set<Element>();
+
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback;
+    MockResizeObserver.instances.push(this);
+  }
+
+  observe = (target: Element) => {
+    this.observed.add(target);
+  };
+
+  unobserve = (target: Element) => {
+    this.observed.delete(target);
+  };
+
+  disconnect = () => {
+    this.observed.clear();
+  };
+
+  trigger(target: Element) {
+    this.callback([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver);
+  }
+}
+
+beforeEach(() => {
+  MockResizeObserver.instances = [];
+  vi.stubGlobal('ResizeObserver', MockResizeObserver);
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+    cb(0);
+    return 1;
+  });
+  vi.stubGlobal('cancelAnimationFrame', () => undefined);
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('ChatPane streaming state', () => {
@@ -289,6 +339,7 @@ Expected output:
   it('shows several queued prompts above the composer before collapsing overflow', () => {
     const onRemoveQueuedSend = vi.fn();
     const onSendQueuedNow = vi.fn();
+    const onUpdateQueuedSend = vi.fn();
     const { container } = render(
       <ChatPane
         messages={[]}
@@ -323,6 +374,7 @@ Expected output:
         ]}
         onRemoveQueuedSend={onRemoveQueuedSend}
         onSendQueuedNow={onSendQueuedNow}
+        onUpdateQueuedSend={onUpdateQueuedSend}
         onEnsureProject={async () => 'project-1'}
         onSend={vi.fn()}
         onStop={vi.fn()}
@@ -337,6 +389,7 @@ Expected output:
     const strip = container.querySelector('.chat-queued-send-strip');
     expect(strip).not.toBeNull();
     expect(strip?.textContent).toContain('5 Queued');
+    expect(strip?.textContent).toContain('to Send');
     expect(strip?.textContent).not.toContain('Start Multitasking');
     expect(container.querySelectorAll('.chat-queued-send-row')).toHaveLength(4);
     expect(strip?.textContent).toContain('Make the export button larger and use a warmer accent');
@@ -353,31 +406,85 @@ Expected output:
 
     const editButtons = screen.getAllByRole('button', { name: 'Edit' });
     fireEvent.click(editButtons[0]!);
-    expect(composerMocks.restoreDraft).toHaveBeenCalledWith({
-      text: 'Make the export button larger and use a warmer accent',
-      attachments: [{ path: 'brief.md', name: 'brief.md', kind: 'file' }],
-      commentAttachments: [
-        {
-          id: 'comment-1',
-          order: 1,
-          filePath: 'preview.html',
-          elementId: 'hero',
-          selector: '#hero',
-          label: 'Hero',
-          comment: 'Use a warmer accent',
-          currentText: 'Export',
-          pagePosition: { x: 10, y: 20, width: 30, height: 40 },
-          htmlHint: '<section id="hero">',
-        },
-      ],
-    });
-    expect(onRemoveQueuedSend).toHaveBeenCalledWith('queued-1');
+    const editInput = screen.getByRole('textbox', { name: 'Edit queued task' });
+    expect((editInput as HTMLInputElement).value).toBe(
+      'Make the export button larger and use a warmer accent',
+    );
+    fireEvent.change(editInput, { target: { value: 'Use a bolder export button' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onUpdateQueuedSend).toHaveBeenCalledWith('queued-1', 'Use a bolder export button');
 
     const removeButtons = screen.getAllByRole('button', { name: 'chat.comments.remove' });
     fireEvent.click(removeButtons[1]!);
     expect(onRemoveQueuedSend).toHaveBeenCalledWith('queued-2');
   });
 
+  it('falls back to the localized queued follow-up label for blank prompts', () => {
+    render(
+      <ChatPane
+        messages={[]}
+        streaming
+        error={null}
+        projectId="project-1"
+        projectFiles={[]}
+        queuedItems={[{ id: 'queued-1', prompt: '   ' }]}
+        onEnsureProject={async () => 'project-1'}
+        onSend={vi.fn()}
+        onStop={vi.fn()}
+        conversations={conversations}
+        activeConversationId="conv-1"
+        onSelectConversation={vi.fn()}
+        onDeleteConversation={vi.fn()}
+        projectMetadata={projectMetadata}
+      />,
+    );
+
+    expect(screen.getByText('Queued follow-up')).toBeTruthy();
+  });
+
+  it('auto-follows when the queued strip resizes while pinned to bottom', () => {
+    const { container } = render(
+      <ChatPane
+        messages={[]}
+        streaming
+        error={null}
+        projectId="project-1"
+        projectFiles={[]}
+        queuedItems={[{ id: 'queued-1', prompt: 'First queued follow-up' }]}
+        onEnsureProject={async () => 'project-1'}
+        onSend={vi.fn()}
+        onStop={vi.fn()}
+        conversations={conversations}
+        activeConversationId="conv-1"
+        onSelectConversation={vi.fn()}
+        onDeleteConversation={vi.fn()}
+        projectMetadata={projectMetadata}
+      />,
+    );
+
+    const log = container.querySelector('.chat-log') as HTMLDivElement | null;
+    const strip = screen.getByTestId('chat-queued-send-strip');
+    expect(log).not.toBeNull();
+    expect(strip).toBeTruthy();
+
+    Object.defineProperty(log!, 'scrollHeight', { configurable: true, get: () => 600 });
+    Object.defineProperty(log!, 'clientHeight', { configurable: true, get: () => 200 });
+    Object.defineProperty(log!, 'scrollTop', {
+      configurable: true,
+      get() {
+        return (this as HTMLDivElement).dataset.scrollTop
+          ? Number((this as HTMLDivElement).dataset.scrollTop)
+          : 400;
+      },
+      set(value: number) {
+        (this as HTMLDivElement).dataset.scrollTop = String(value);
+      },
+    });
+
+    MockResizeObserver.instances[0]?.trigger(strip);
+
+    expect(log!.scrollTop).toBe(600);
+  });
 });
 
 const conversations: Conversation[] = [

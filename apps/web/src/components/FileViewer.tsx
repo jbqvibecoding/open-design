@@ -4194,11 +4194,23 @@ function HtmlViewer({
       sourceRef.current = null;
     }
     let cancelled = false;
-    void fetchProjectFileText(projectId, file.name).then((text) => {
-      if (!cancelled) {
-        setSource(text);
-        sourceRef.current = text;
-      }
+    // Cache-bust the fetch on every mtime / reload / files-refresh bump.
+    // Without this, an agent edit during Comment mode (srcDoc path) gets
+    // stale HTML from the browser HTTP cache — the source state ends up
+    // identical to the previous value, srcDoc is byte-equal to the last
+    // activated HTML, canActivateSrcDocTransport bails on the dedupe
+    // check, and the preview only refreshes when Comment closes and the
+    // url-load iframe takes over with its own ?v=mtime cache-bust.
+    void fetchProjectFileText(projectId, file.name, {
+      cacheBustKey: `${file.mtime}-${reloadKey}-${filesRefreshKey}`,
+    }).then((text) => {
+      if (cancelled) return;
+      // Chokidar emits agent rewrites as unlink+add+change bursts; a
+      // transient null mid-burst would blank source → srcDoc empty →
+      // shell stays on prior frame. Keep the last good text instead.
+      if (text == null) return;
+      setSource(text);
+      sourceRef.current = text;
     });
     return () => {
       cancelled = true;
@@ -4373,12 +4385,30 @@ function HtmlViewer({
       shellReady: srcDocShellReady,
       activatedHtml: activatedSrcDocTransportHtmlRef.current,
     })) return false;
+    // A SECOND activation while Comment mode is on would document.open +
+    // write over the iframe's existing document. The window-level message
+    // listener survives, but iframe.onLoad does NOT refire for
+    // document.write, so host-side re-init (slide nav sync, scroll
+    // restore, bridge replay) is silently skipped — the visible page can
+    // drift out of sync with the host's tracked state (e.g. the page
+    // indicator shows 3 while the iframe rendered page 4 of the freshly
+    // edited deck). Force a fresh shell mount under Comment so onLoad
+    // fires and the full re-init pipeline runs against the new HTML.
+    //
+    // Skip the remount path in Manual Edit, where the postMessage
+    // activate carries the patched HTML and host-side scroll/slide
+    // state intentionally stays put across the patch.
+    if (boardMode && activatedSrcDocTransportHtmlRef.current !== null) {
+      activatedSrcDocTransportHtmlRef.current = null;
+      setSrcDocTransportResetKey((key) => key + 1);
+      return true;
+    }
     const win = target?.contentWindow;
     if (!win) return false;
     win.postMessage({ type: 'od:srcdoc-transport-activate', html: srcDoc }, '*');
     activatedSrcDocTransportHtmlRef.current = srcDoc;
     return true;
-  }, [srcDoc, useLazySrcDocTransport, useUrlLoadPreview, srcDocShellReady]);
+  }, [srcDoc, useLazySrcDocTransport, useUrlLoadPreview, srcDocShellReady, boardMode]);
   const activateLoadedSrcDocTransport = useCallback((target: HTMLIFrameElement | null = srcDocPreviewIframeRef.current) => {
     if (!canActivateSrcDocTransport({
       srcDoc,
@@ -5041,6 +5071,18 @@ function HtmlViewer({
         setSelectedManualEditTarget((current) => current?.id === patch.id
           ? { ...current, text: patch.value, fields: { ...current.fields, text: patch.value } }
           : current);
+      } else if (patch.kind === 'remove-element') {
+        if (manualEditPendingStyleRef.current?.id === patch.id) {
+          manualEditPendingStyleRef.current = null;
+          clearManualEditStyleTimer();
+        }
+        selectedManualEditTargetIdRef.current = null;
+        setSelectedManualEditTarget(null);
+        setManualEditTargets((current) => current.filter((target) => target.id !== patch.id));
+        setManualEditDraft(emptyManualEditDraft(result.source));
+        postSelectedManualEditTargetToIframe(null);
+      } else {
+        setManualEditDraft((current) => ({ ...current, fullSource: result.source }));
       }
       if (patch.kind === 'set-style') {
         reconcileManualEditStyleSave(patch.id, patch.styles, result.source);

@@ -137,11 +137,13 @@ function hasTerminalRunEnded(
 
 function stoppedTodoWriteInput(input: unknown): unknown {
   if (!input || typeof input !== 'object') return input;
-  const obj = input as { todos?: unknown };
-  if (!Array.isArray(obj.todos)) return input;
+  const obj = input as { todos?: unknown; plan?: unknown };
+  const key = Array.isArray(obj.todos) ? 'todos' : Array.isArray(obj.plan) ? 'plan' : null;
+  if (!key) return input;
+  const items = obj[key] as unknown[];
   return {
     ...(input as Record<string, unknown>),
-    todos: obj.todos.map((todo) => {
+    [key]: items.map((todo) => {
       if (!todo || typeof todo !== 'object') return todo;
       const record = todo as Record<string, unknown>;
       if (record.status !== 'in_progress') return todo;
