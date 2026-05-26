@@ -35,7 +35,7 @@
 >
 > 不只是原型工具——从想法到原型、到网页、到 HTML 视频（HyperFrames），产品设计的完整全流程都在这里完成。
 >
-> OD 会记住你确认过的字体、色彩、布局和交付偏好，沉淀成可复用的 [`DESIGN.md`](../../design-systems/README.md) Design System，用得越多越像你的团队设计助手。
+> OpenDesign 会记住你确认过的字体、色彩、布局和交付偏好，沉淀成可复用的 DESIGN.md（Design System），用得越多越像你的团队设计助手。
 
 ---
 
