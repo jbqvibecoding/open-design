@@ -666,26 +666,6 @@
 /* Claude Code-style edit inspector panel. */
 .cc-panel { display: flex; flex-direction: column; gap: 0; padding: 8px 0; overflow: hidden; background: var(--bg-panel); }
 .cc-inspector { display: flex; flex-direction: column; gap: 12px; padding: 6px 12px; }
-.cc-inspector-nav {
-  display: flex;
-  justify-content: flex-start;
-  margin-bottom: -4px;
-}
-.cc-inspector-page {
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-panel);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-}
-.cc-inspector-page:hover:not(:disabled) {
-  border-color: var(--border-strong);
-  color: var(--text);
-  background: var(--bg-subtle);
-}
 .cc-section { display: flex; flex-direction: column; gap: 6px; }
 .cc-section-inactive { opacity: 0.58; }
 .cc-section-head {

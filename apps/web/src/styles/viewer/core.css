@@ -124,6 +124,10 @@
   background: var(--accent-tint);
   color: var(--accent-strong);
 }
+.viewer-action.active:hover:not(:disabled) {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+}
 .viewer-action.primary {
   background: var(--accent);
   border: 1px solid var(--accent);
