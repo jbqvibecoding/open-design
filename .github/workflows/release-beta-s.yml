@@ -19,6 +19,33 @@ on:
         required: true
         type: string
         default: "0.8.1-beta.0"
+      smoke_mode:
+        description: "Windows smoke coverage."
+        required: true
+        type: choice
+        options:
+          - fast
+          - full
+        default: fast
+      target:
+        description: "Windows build target."
+        required: true
+        type: choice
+        options:
+          - nsis
+          - all
+          - zip
+          - dir
+        default: nsis
+      sign_mode:
+        description: "Windows signing mode."
+        required: true
+        type: choice
+        options:
+          - auto
+          - off
+          - on
+        default: auto
 
 permissions:
   contents: read
@@ -53,7 +80,7 @@ jobs:
         shell: cmd
         run: |
           @echo on
-          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .github\scripts\release\build-beta.ps1 -Platform win -Lane self-hosted -Namespace release-beta-win -ReleaseVersion "${{ inputs.release_version }}" -SmokeMode fast -Target nsis
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .github\scripts\release\build-beta.ps1 -Platform win -Lane self-hosted -Namespace release-beta-win -ReleaseVersion "${{ inputs.release_version }}" -SmokeMode "${{ inputs.smoke_mode }}" -Target "${{ inputs.target }}" -SignMode "${{ inputs.sign_mode }}"
 
       - name: Publish local summary
         if: ${{ always() }}
