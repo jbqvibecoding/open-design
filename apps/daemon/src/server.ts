@@ -2379,15 +2379,22 @@ function formAnswerTransitionForCurrentPrompt(currentPrompt) {
     '## Latest user turn - form answers submitted',
     trimmed,
     '',
-    `The user has answered the ${formId} form. Do NOT emit another <question-form> of any kind. The brief is locked.`,
+    // Keep the wording in lock-step with main — the stronger "do not
+    // emit any `<question-form>`" suppression now lives in the
+    // system-prompt `FORM_ANSWERED_SYSTEM_OVERRIDE` block, which
+    // every plain / stream-json adapter sees. Diverging the
+    // user-request transition string here breaks `chat-route.test
+    // marks submitted discovery form answers ...` which asserts on
+    // the exact main wording.
+    `The user has answered the ${formId} form. Do not emit another ${formId} form.`,
   ];
-  if (formId.toLowerCase() === 'discovery' || formId.toLowerCase() === 'task-type') {
+  if (formId.toLowerCase() === 'discovery') {
     lines.push(
-      'Continue with RULE 2 / RULE 3 now. For Branch B answers, build now instead of asking another brief. SKIP RULE 1 entirely — the form has already been answered.',
+      'Continue with RULE 2 / RULE 3 now. For Branch B answers, build now instead of asking another brief.',
     );
   } else {
     lines.push(
-      'Treat these form answers as the active user turn instead of replaying the transcript as a fresh request. Do NOT re-ask for information already provided.',
+      'Treat these form answers as the active user turn instead of replaying the transcript as a fresh request.',
     );
   }
   return lines.join('\n');
