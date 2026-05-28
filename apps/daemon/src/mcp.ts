@@ -38,7 +38,7 @@ interface ProjectPayload { project?: ProjectSummary; id?: string; name?: string;
 interface ActiveContext { active?: boolean; projectId?: string; projectName?: string | null; fileName?: string | null; ageMs?: number | null }
 type ResolvedProject = { id: string; name: string; source: 'uuid' | 'id' | 'exact' | 'slug' | 'substring' };
 interface ProjectListCache { baseUrl: string; t: number; list: ProjectSummary[] }
-interface McpArgs extends JsonObject { project?: unknown; entry?: unknown; include?: unknown; maxBytes?: unknown; path?: unknown; offset?: unknown; limit?: unknown; since?: unknown; query?: unknown; pattern?: unknown; max?: unknown; name?: unknown; content?: unknown; encoding?: unknown; artifactManifest?: unknown; confirm?: unknown; prompt?: unknown; plugin?: unknown; inputs?: unknown; agent?: unknown; model?: unknown; runId?: unknown; id?: unknown; designSystem?: unknown; skill?: unknown }
+interface McpArgs extends JsonObject { project?: unknown; entry?: unknown; include?: unknown; maxBytes?: unknown; path?: unknown; offset?: unknown; limit?: unknown; since?: unknown; query?: unknown; pattern?: unknown; max?: unknown; name?: unknown; content?: unknown; encoding?: unknown; artifactManifest?: unknown; confirm?: unknown; prompt?: unknown; plugin?: unknown; inputs?: unknown; agent?: unknown; model?: unknown; runId?: unknown; id?: unknown; designSystem?: unknown; skill?: unknown; includeUnavailable?: unknown }
 interface ProjectFileBundleEntry { name: string; mime: string; size: number | null; content: string | null; binary: boolean }
 interface BundleInput { project: ProjectPayload | ProjectSummary; entry: string; files: ProjectFileBundleEntry[]; truncated: boolean; active: ActiveContext | null; resolved?: ResolvedProject | null }
 interface ErrorWithCode { message?: string; code?: string; cause?: { code?: string } }
@@ -409,6 +409,22 @@ const TOOL_DEFS = [
     },
     annotations: { ...WRITE_ANNOTATIONS, title: 'Cancel Open Design run' },
   },
+  {
+    name: 'list_agents',
+    description:
+      'List the agent CLIs Open Design can run for start_run.agent. Returns only installed (available) agents by default — pass includeUnavailable:true to also see agents we know about but that are not on PATH (each carries an installUrl for the user). Each entry includes id, name, version, and up to 10 sample models (modelsCount carries the real total).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        includeUnavailable: {
+          type: 'boolean',
+          description: 'When true, include agents whose binary is not installed. Defaults to false.',
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: { ...READ_ANNOTATIONS, title: 'List Open Design agents' },
+  },
 ];
 
 export async function runMcpStdio({ daemonUrl }: RunMcpOptions): Promise<void> {
@@ -460,6 +476,9 @@ export async function runMcpStdio({ daemonUrl }: RunMcpOptions): Promise<void> {
         'To make Open Design GENERATE or refine a design (rather than just',
         'read/edit files), commission a run - you do not run skills yourself:',
         ' - list_skills / list_plugins to see what you can ask OD to make.',
+        ' - list_agents when you need to pass start_run.agent — do not',
+        '    guess "claude" / "codex" / "gemini"; only agents in the',
+        '    returned list will actually spawn on this machine.',
         ' - create_project(name) first if you need a fresh project to',
         '    generate into; start_run requires an existing project.',
         ' - start_run(prompt, [plugin], [inputs]) kicks off generation in',
@@ -634,7 +653,8 @@ async function handleMcpToolCall(baseUrl: string, name: unknown, args: McpArgs) 
         const data = await getJson<ProjectPayload>(`${baseUrl}/api/projects/${encodeURIComponent(id)}`);
         const project = data?.project ?? data;
         const resolvedDir = typeof data?.resolvedDir === 'string' ? data.resolvedDir : null;
-        const entryFile = project?.metadata?.entryFile ?? null;
+        const declaredEntry = project?.metadata?.entryFile ?? null;
+        const entryFile = await resolveProjectEntry(baseUrl, id, declaredEntry);
         const previewUrl = rawPreviewUrl(baseUrl, id, entryFile);
         return ok(
           withActiveEcho(
@@ -710,6 +730,8 @@ async function handleMcpToolCall(baseUrl: string, name: unknown, args: McpArgs) 
         return ok(await getJson<SkillsPayload>(`${baseUrl}/api/skills`));
       case 'list_plugins':
         return ok(await listPlugins(baseUrl));
+      case 'list_agents':
+        return ok(await listAgents(baseUrl, args.includeUnavailable === true));
       case 'start_run':
         return await startRun(baseUrl, args);
       case 'get_run':
@@ -876,6 +898,39 @@ async function listPlugins(baseUrl: string): Promise<JsonObject> {
   return { plugins };
 }
 
+// Flatten daemon's agent definition into the few fields an external
+// agent needs to pick a value for start_run.agent. Default filters to
+// `available: true` (only installed CLIs) so the outer agent doesn't
+// pick an agent it can't actually run — the failure mode that left us
+// with zombie "running" runs whose inner Claude binary never spawned.
+// Models are truncated to 10 with `modelsCount` carrying the full
+// total; that keeps the response token-economical even for agents
+// (e.g. opencode) that expose 100+ models.
+async function listAgents(baseUrl: string, includeUnavailable: boolean): Promise<JsonObject> {
+  const raw = await getJson<{ agents?: JsonObject[] }>(`${baseUrl}/api/agents`);
+  const all = raw?.agents ?? [];
+  const filtered = includeUnavailable
+    ? all
+    : all.filter((a) => a?.available === true);
+  const MAX_MODELS = 10;
+  const agents = filtered.map((a) => {
+    const models = Array.isArray(a?.models) ? (a.models as unknown[]) : [];
+    const out: JsonObject = {
+      id: a?.id,
+      name: a?.name,
+      models: models.slice(0, MAX_MODELS),
+      modelsCount: models.length,
+    };
+    if (typeof a?.version === 'string' && a.version.length > 0) out.version = a.version;
+    if (includeUnavailable) {
+      out.available = Boolean(a?.available);
+      if (typeof a?.installUrl === 'string') out.installUrl = a.installUrl;
+    }
+    return out;
+  });
+  return { agents };
+}
+
 // Derive a valid project id ([A-Za-z0-9._-], <=128) from a display name,
 // with a short random suffix so repeated creates with the same name
 // don't collide on the daemon's primary key.
@@ -983,6 +1038,35 @@ async function fetchRunAgentMessage(baseUrl: string, runId: string): Promise<str
   }
 }
 
+// Resolve a project's entry file, preferring metadata.entryFile when
+// set and falling back to scanning the file list. This matters because
+// real-world writes (write_file, half-finished inner-agent runs)
+// leave metadata.entryFile null even when a perfectly viewable
+// index.html exists at the project root — without the fallback,
+// get_project/get_run would silently omit previewUrl and force the
+// outer agent to guess a file:// path.
+async function resolveProjectEntry(baseUrl: string, projectId: string, declared: unknown): Promise<string | null> {
+  if (typeof declared === 'string' && declared.length > 0) return declared;
+  try {
+    const data = await getJson<{ files?: Array<{ path?: string; name?: string; kind?: string }> }>(
+      `${baseUrl}/api/projects/${encodeURIComponent(projectId)}/files`,
+    );
+    const files = data?.files ?? [];
+    // index.html wins at any level — the conventional entry signal.
+    const indexHtml = files.find((f) => f?.path === 'index.html' || f?.name === 'index.html');
+    if (indexHtml?.path) return indexHtml.path;
+    // Otherwise: if exactly one .html sits at the project root, that
+    // is unambiguous enough to pick. Don't guess past one match.
+    const htmlAtRoot = files.filter(
+      (f) => typeof f?.path === 'string' && !f.path.includes('/') && f.path.toLowerCase().endsWith('.html'),
+    );
+    if (htmlAtRoot.length === 1 && htmlAtRoot[0]?.path) return htmlAtRoot[0].path;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // Build the raw URL that renders a project's entry file. The raw route
 // serves it with the right Content-Type and resolves sibling
 // CSS/JS/img relative to the same dir, so this URL opens directly in a
@@ -1006,7 +1090,8 @@ async function buildRunPreviewUrl(baseUrl: string, projectId: string): Promise<s
       `${baseUrl}/api/projects/${encodeURIComponent(projectId)}`,
     );
     const project = data?.project ?? data;
-    const entry = (project as { metadata?: JsonObject } | undefined)?.metadata?.entryFile;
+    const declared = (project as { metadata?: JsonObject } | undefined)?.metadata?.entryFile;
+    const entry = await resolveProjectEntry(baseUrl, projectId, declared);
     return rawPreviewUrl(baseUrl, projectId, entry);
   } catch {
     return null;

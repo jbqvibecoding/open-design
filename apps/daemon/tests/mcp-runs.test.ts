@@ -213,9 +213,76 @@ describe('public MCP discovery + generation tools', () => {
   });
 
   it('get_project omits previewUrl when the project has no entry file', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ project: { id: PROJECT_UUID, name: 'P1', metadata: {} } }), { status: 200 }),
-    );
+    // No metadata.entryFile AND no html file in /files — must omit.
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith('/api/projects/' + PROJECT_UUID + '/files')) {
+        return new Response(JSON.stringify({ files: [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ project: { id: PROJECT_UUID, name: 'P1', metadata: {} } }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await handleMcpToolCall('http://127.0.0.1:17456', 'get_project', { project: PROJECT_UUID });
+    const parsed = JSON.parse(firstText(result));
+    expect(parsed.previewUrl).toBeUndefined();
+  });
+
+  // Real-world snag we hit: write_file (and a midstream-killed inner
+  // agent) write files into the project but leave metadata.entryFile
+  // null, so get_project.previewUrl came back undefined even though
+  // /raw/index.html was perfectly viewable. Outer agent then guessed a
+  // file:// path. Fix: when metadata is silent, peek the file list and
+  // fall back to obvious entries (index.html first, then a single .html).
+  it('get_project falls back to index.html when metadata.entryFile is missing but the file exists', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith('/api/projects/' + PROJECT_UUID + '/files')) {
+        return new Response(JSON.stringify({
+          files: [
+            { name: 'index.html', path: 'index.html', kind: 'html' },
+            { name: 'styles.css', path: 'styles.css', kind: 'css' },
+          ],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ project: { id: PROJECT_UUID, name: 'P1', metadata: { skipDiscoveryBrief: true } } }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await handleMcpToolCall('http://127.0.0.1:17456', 'get_project', { project: PROJECT_UUID });
+    const parsed = JSON.parse(firstText(result));
+    expect(parsed.previewUrl).toBe(`http://127.0.0.1:17456/api/projects/${PROJECT_UUID}/raw/index.html`);
+  });
+
+  it('get_project falls back to the only *.html when no index.html and no entryFile', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith('/api/projects/' + PROJECT_UUID + '/files')) {
+        return new Response(JSON.stringify({
+          files: [
+            { name: 'deck.html', path: 'deck.html', kind: 'html' },
+            { name: 'styles.css', path: 'styles.css', kind: 'css' },
+          ],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ project: { id: PROJECT_UUID, metadata: {} } }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await handleMcpToolCall('http://127.0.0.1:17456', 'get_project', { project: PROJECT_UUID });
+    const parsed = JSON.parse(firstText(result));
+    expect(parsed.previewUrl).toBe(`http://127.0.0.1:17456/api/projects/${PROJECT_UUID}/raw/deck.html`);
+  });
+
+  it('get_project does not guess when there are multiple HTML files and no entryFile', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith('/api/projects/' + PROJECT_UUID + '/files')) {
+        return new Response(JSON.stringify({
+          files: [
+            { name: 'a.html', path: 'a.html', kind: 'html' },
+            { name: 'b.html', path: 'b.html', kind: 'html' },
+          ],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ project: { id: PROJECT_UUID, metadata: {} } }), { status: 200 });
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await handleMcpToolCall('http://127.0.0.1:17456', 'get_project', { project: PROJECT_UUID });
@@ -374,5 +441,94 @@ describe('public MCP discovery + generation tools', () => {
     ]);
     expect(parsed.plugins[0]).not.toHaveProperty('fsPath');
     expect(parsed.plugins[0]).not.toHaveProperty('sourceKind');
+  });
+
+  // list_agents lets the outer agent stop guessing 'claude' vs 'codex'
+  // vs 'gemini' for start_run.agent. We slim /api/agents (15+ fields per
+  // record) and default to filtering out unavailable ones so the agent
+  // only sees runnable options.
+
+  it('list_agents returns only available agents in a slim shape by default', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      agents: [
+        {
+          id: 'claude',
+          name: 'Claude Code',
+          bin: 'claude',
+          version: '2.1.153',
+          available: true,
+          path: '/usr/local/bin/claude',
+          installUrl: 'https://…',
+          versionArgs: ['--version'],
+          promptViaStdin: true,
+          promptInputFormat: 'stream-json',
+          streamFormat: 'claude-stream-json',
+          models: [
+            { id: 'default', label: 'Default' },
+            { id: 'sonnet', label: 'Sonnet' },
+            { id: 'opus', label: 'Opus' },
+          ],
+        },
+        {
+          id: 'devin',
+          name: 'Devin for Terminal',
+          bin: 'devin',
+          version: null,
+          available: false,
+          path: null,
+          installUrl: 'https://…',
+          models: [{ id: 'default', label: 'Default' }],
+        },
+      ],
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await handleMcpToolCall('http://127.0.0.1:17456', 'list_agents', {});
+    const parsed = JSON.parse(firstText(result));
+    expect(parsed.agents).toHaveLength(1);
+    expect(parsed.agents[0]).toEqual({
+      id: 'claude',
+      name: 'Claude Code',
+      version: '2.1.153',
+      models: [
+        { id: 'default', label: 'Default' },
+        { id: 'sonnet', label: 'Sonnet' },
+        { id: 'opus', label: 'Opus' },
+      ],
+      modelsCount: 3,
+    });
+    // Protocol fields we don't want the agent reasoning about:
+    expect(parsed.agents[0]).not.toHaveProperty('bin');
+    expect(parsed.agents[0]).not.toHaveProperty('promptInputFormat');
+    expect(parsed.agents[0]).not.toHaveProperty('streamFormat');
+  });
+
+  it('list_agents truncates very long model lists but reports the real count', async () => {
+    const longModels = Array.from({ length: 165 }, (_, i) => ({ id: `m-${i}`, label: `M${i}` }));
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      agents: [{ id: 'opencode', name: 'OpenCode', available: true, models: longModels }],
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await handleMcpToolCall('http://127.0.0.1:17456', 'list_agents', {});
+    const parsed = JSON.parse(firstText(result));
+    expect(parsed.agents[0].models).toHaveLength(10);
+    expect(parsed.agents[0].modelsCount).toBe(165);
+  });
+
+  it('list_agents includeUnavailable:true returns unavailable agents with hints', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      agents: [
+        { id: 'claude', name: 'Claude Code', available: true, models: [] },
+        { id: 'devin', name: 'Devin', available: false, installUrl: 'https://cli.devin.ai', models: [] },
+      ],
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await handleMcpToolCall('http://127.0.0.1:17456', 'list_agents', { includeUnavailable: true });
+    const parsed = JSON.parse(firstText(result));
+    expect(parsed.agents).toHaveLength(2);
+    const devin = parsed.agents.find((a: { id: string }) => a.id === 'devin');
+    expect(devin).toMatchObject({ id: 'devin', available: false, installUrl: 'https://cli.devin.ai' });
   });
 });
