@@ -94,37 +94,20 @@
    Recent projects strip
    ================================================================ */
 
-.recent-projects__row {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Plugin cards grid
    ================================================================ */
 
-.plugins-home__grid {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Design grid
    ================================================================ */
 
-.design-grid {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-.design-kanban-board {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Automations template grid
    ================================================================ */
-
-.automations-templates__grid {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Integrations view
@@ -198,21 +181,9 @@
   animation: od-fade-in 250ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
-.chat-history-list {
-  animation: od-fade-in 160ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
 /* ================================================================
    File viewer & workspace
    ================================================================ */
-
-.viewer-body {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-.viewer-tabs {
-  animation: od-fade-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 .viewer-empty {
   animation: od-fade-in 250ms cubic-bezier(0.23, 1, 0.32, 1) both;
@@ -230,21 +201,11 @@
   animation: od-slide-left 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
-.comment-side-list {
-  animation: od-fade-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Settings dialog
    ================================================================ */
 
-.settings-sidebar {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-.settings-content {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) 40ms both;
-}
 
 .settings-section {
   animation: od-fade-slide-up 250ms cubic-bezier(0.23, 1, 0.32, 1) both;
@@ -254,9 +215,6 @@
    Memory panels
    ================================================================ */
 
-.memory-tab-panel {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 .memory-suggestion-panel {
   animation: od-fade-slide-up 280ms cubic-bezier(0.23, 1, 0.32, 1) both;
@@ -270,16 +228,8 @@
    MCP section
    ================================================================ */
 
-.mcp-rows {
-  animation: od-fade-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
 .mcp-picker {
   animation: od-fade-slide-up 250ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-.mcp-picker-grid {
-  animation: od-fade-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
 /* ================================================================
@@ -288,10 +238,6 @@
 
 .marketplace-view__header {
   animation: od-fade-slide-up 300ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-.marketplace-view__grid {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
 .marketplace-view__empty {
@@ -307,17 +253,11 @@
 }
 
 
-.library-preview {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Design files panel
    ================================================================ */
 
-.df-breadcrumbs {
-  animation: od-fade-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 
 /* ================================================================
@@ -382,9 +322,6 @@
    Automation / routine history rows
    ================================================================ */
 
-.automation-history {
-  animation: od-fade-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Example cards (ExamplesTab)
@@ -395,21 +332,11 @@
    Entry sections (Home tabs)
    ================================================================ */
 
-.entry-section {
-  animation: od-fade-in 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-.entry-section__title {
-  animation: od-fade-slide-up 300ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Tab content panels
    ================================================================ */
 
-.tab-panel {
-  animation: od-fade-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Agent / model cards
@@ -445,9 +372,6 @@
    Skills section rows
    ================================================================ */
 
-.skills-rows {
-  animation: od-fade-in 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Onboarding / new project panels
@@ -496,17 +420,10 @@
    Code viewer
    ================================================================ */
 
-.code-viewer {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 /* ================================================================
    Live artifact panels
    ================================================================ */
-
-.live-artifact-code-panel {
-  animation: od-fade-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
 
 .live-artifact-refresh-panel {
   animation: od-slide-left 250ms cubic-bezier(0.23, 1, 0.32, 1) both;
