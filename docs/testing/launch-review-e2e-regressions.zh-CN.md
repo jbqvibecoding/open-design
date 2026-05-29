@@ -392,6 +392,10 @@ pnpm exec playwright test -c playwright.config.ts ui/design-systems-manager.test
      - `generated-plugin/SKILL.md`
    - daemon 会把本轮转成 `failed`，而不是错误地保留 `succeeded`
 
+2. `allows plugin authoring to succeed when the requested generated-plugin artifacts exist before close`
+   - 覆盖同一条 guard 的对称路径：只要关键插件产物已经落地，就不会被误伤成失败
+   - 锁住 daemon 的判断是“缺少目标产物才失败”，而不是“只要文本看起来像计划句就失败”
+
 
 ### 6. Grok Build prompt inline argv 契约
 
