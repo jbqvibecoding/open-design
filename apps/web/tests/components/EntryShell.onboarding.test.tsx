@@ -315,6 +315,51 @@ describe('EntryShell onboarding Open Design AMR runtime', () => {
     });
   });
 
+  // First-install repro: AMR was detected while signed out (empty, fail-closed
+  // model list). After device authorization completes the live `vela models`
+  // catalog becomes fetchable, so onboarding must re-detect agents — otherwise
+  // the Settings model picker stays empty until an app restart / reinstall.
+  it('re-detects agents after AMR device authorization completes during onboarding', async () => {
+    let statusCalls = 0;
+    const fetchMock = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/api/integrations/vela/status')) {
+        statusCalls += 1;
+        return jsonResponse(
+          statusCalls >= 3
+            ? {
+                loggedIn: true,
+                profile: 'prod',
+                user: { id: 'u', email: 'user@example.com' },
+                configPath: '/x',
+              }
+            : { loggedIn: false, profile: 'prod', user: null, configPath: '/x' },
+        );
+      }
+      if (url.endsWith('/api/integrations/vela/login') && init?.method === 'POST') {
+        return jsonResponse({ pid: 123 }, 202);
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+    const onRefreshAgents = vi.fn(() => [
+      amrAgent({ models: [{ id: 'glm-5.1', label: 'glm-5.1' }] }),
+      cliAgent(),
+    ]);
+    renderOnboarding({ onRefreshAgents });
+
+    const signIn = await screen.findByRole('button', { name: /Sign in to continue/i });
+    vi.useFakeTimers();
+    fireEvent.click(signIn);
+    await act(async () => {});
+
+    expect(onRefreshAgents).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2000);
+    await vi.waitFor(() => {
+      expect(onRefreshAgents).toHaveBeenCalled();
+    });
+  });
+
   it('recovers from a transient status failure during login polling and still continues after authorization completes', async () => {
     let statusCalls = 0;
     const fetchMock = vi.fn(async (input, init) => {

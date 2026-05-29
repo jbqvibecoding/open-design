@@ -1376,6 +1376,16 @@ function OnboardingView({
         return;
       }
       if (await pollAmrLoginCompletion()) {
+        // Re-detect agents now that AMR is signed in: the live `vela models`
+        // catalog only becomes fetchable after the credential lands, and the
+        // last detection ran while signed out (empty, fail-closed model
+        // list). Without this the model picker stays empty until an app
+        // restart. Best-effort — Settings can still rescan manually.
+        try {
+          await onRefreshAgents();
+        } catch {
+          // ignore; sign-in itself succeeded
+        }
         setStep((current) => current + 1);
       }
     } finally {

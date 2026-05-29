@@ -213,6 +213,14 @@ export interface AgentRefreshOptions {
   agentCliEnv?: AppConfig['agentCliEnv'];
 }
 
+// When AMR sign-in completes, vela's live `models` catalog can lag the
+// credential write by a beat (the link backend has to register the freshly
+// authorized device). Re-detect a few times so a momentarily-empty catalog
+// doesn't leave the model picker hidden — the symptom that previously needed
+// an app restart / reinstall to clear.
+const AMR_SIGN_IN_RESCAN_ATTEMPTS = 4;
+const AMR_SIGN_IN_RESCAN_RETRY_MS = 1500;
+
 function codexPathStrings(locale: Locale) {
   if (locale === 'zh-CN') {
     return {
@@ -958,6 +966,10 @@ export function SettingsDialog({
   const providerTestAbortRef = useRef<AbortController | null>(null);
   const providerModelsAbortRef = useRef<AbortController | null>(null);
   const pendingAgentInstallRescanRef = useRef(false);
+  // Tracks the last observed AMR login state so we only re-detect agents on
+  // the signed-out -> signed-in edge (not on a mount that is already signed
+  // in, whose agent list was detected with the live catalog already present).
+  const prevAmrLoggedInRef = useRef<boolean | null>(null);
   const agentTestRevisionRef = useRef(0);
   const providerTestRevisionRef = useRef(0);
   const providerModelsRevisionRef = useRef(0);
@@ -1191,6 +1203,44 @@ export function SettingsDialog({
       window.removeEventListener('focus', handleReturnToSettings);
     };
   }, [agentRescanRunning, handleRefreshAgents]);
+
+  // Re-detect agents the moment AMR sign-in completes. The agent list (and
+  // thus AMR's model dropdown) was last detected while signed out, so AMR
+  // came back with an empty, fail-closed model list; the live `vela models`
+  // catalog only becomes fetchable once the credential lands. Without this
+  // the "live model list" picker stays hidden until an app restart.
+  useEffect(() => {
+    const loggedIn = amrCardStatus?.loggedIn ?? null;
+    const previouslyLoggedIn = prevAmrLoggedInRef.current;
+    prevAmrLoggedInRef.current = loggedIn;
+    if (previouslyLoggedIn !== false || loggedIn !== true) return;
+    let cancelled = false;
+    void (async () => {
+      for (
+        let attempt = 0;
+        attempt < AMR_SIGN_IN_RESCAN_ATTEMPTS && !cancelled;
+        attempt += 1
+      ) {
+        let next: void | AgentInfo[];
+        try {
+          next = await onRefreshAgents(agentRefreshOptionsForConfig(cfg));
+        } catch {
+          return;
+        }
+        const detected = Array.isArray(next) ? next : [];
+        const amr = detected.find((agent) => agent.id === 'amr');
+        // Stop once the live catalog has caught up (or AMR vanished); a still
+        // empty list means vela hasn't published the catalog yet, so retry.
+        if (!amr || (amr.models?.length ?? 0) > 0) return;
+        await new Promise((resolve) => {
+          setTimeout(resolve, AMR_SIGN_IN_RESCAN_RETRY_MS);
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [amrCardStatus?.loggedIn, onRefreshAgents, cfg]);
 
   const handleTestAgent = async () => {
     if (agentTestState.status === 'running') {

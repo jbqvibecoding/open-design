@@ -1812,6 +1812,66 @@ describe('SettingsDialog execution settings Local CLI interactions', () => {
     expect(screen.getByText('late@example.com')).toBeTruthy();
   });
 
+  // First-install repro: the agent list is last detected while signed out, so
+  // AMR comes back with an empty (fail-closed) model list. The live `vela
+  // models` catalog only becomes fetchable AFTER the credential lands, so when
+  // the user signs in the UI must re-detect agents — otherwise the "live model
+  // list" dropdown stays hidden until the app is restarted / reinstalled.
+  it('re-detects agents when AMR sign-in completes so the live model list appears without a restart', async () => {
+    let loggedIn = false;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === '/api/memory') {
+        return new Response(
+          JSON.stringify({ enabled: true, memories: [], extraction: null }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (url === '/api/integrations/vela/status') {
+        return new Response(
+          JSON.stringify({
+            loggedIn,
+            loginInFlight: false,
+            profile: 'local',
+            user: loggedIn ? { id: 'u1', email: 'amr@example.com' } : null,
+            configPath: '/Users/test/.amr/config.json',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // AMR detected while signed out -> empty, fail-closed model list.
+    const signedOutAmr: AgentInfo = { ...amrAgent, models: [] };
+    const onRefreshAgents = vi.fn<OnRefreshAgents>(async () => [
+      { ...amrAgent, models: [{ id: 'glm-5.1', label: 'glm-5.1' }] },
+    ]);
+
+    renderSettingsDialog(
+      { mode: 'daemon', agentId: 'amr' },
+      { agents: [signedOutAmr], onRefreshAgents },
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /Local CLI.*1 installed/i }));
+    // The initial signed-out detection must NOT trigger a rescan on its own.
+    await screen.findByRole('button', { name: 'Authorize' });
+    expect(onRefreshAgents).not.toHaveBeenCalled();
+
+    // Login completes out-of-band (vela CLI owns the browser device flow).
+    loggedIn = true;
+    window.dispatchEvent(
+      new CustomEvent('od:amr-login-status-change', {
+        detail: { reason: 'status-changed' },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(onRefreshAgents).toHaveBeenCalled();
+    });
+  });
+
   it('renders the signed-in AMR account state inside Settings without leaking vela branding', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = input.toString();
