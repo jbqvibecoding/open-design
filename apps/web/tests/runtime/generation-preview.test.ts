@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   buildGenerationPreviewState,
   derivePrototypeGenerationSteps,
-  formatGenerationElapsed,
   workspaceHasPreviewSurface,
 } from '../../src/runtime/generation-preview';
 import type { AgentEvent, ChatMessage } from '../../src/types';
@@ -309,8 +308,4 @@ describe('generation preview helpers', () => {
     ).toBeNull();
   });
 
-  it('formats elapsed durations for the meta row', () => {
-    expect(formatGenerationElapsed(42)).toBe('42s');
-    expect(formatGenerationElapsed(125)).toBe('2m 5s');
-  });
 });

@@ -257,20 +257,6 @@
   }
 }
 
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-faint);
-}
-
-.metaDivider {
-  opacity: 0.6;
-}
-
 .retry {
   margin-top: 4px;
   min-height: 34px;

@@ -249,14 +249,6 @@ export function generationPreviewProgress(steps: GenerationPreviewStep[]): numbe
   return Math.max(8, Math.min(steps.some((step) => step.status === 'failed') ? 72 : 92, Math.round(score * 100)));
 }
 
-export function formatGenerationElapsed(seconds: number): string {
-  const safe = Math.max(0, Math.floor(seconds));
-  if (safe < 60) return `${safe}s`;
-  const minutes = Math.floor(safe / 60);
-  const remainder = safe % 60;
-  return remainder > 0 ? `${minutes}m ${remainder}s` : `${minutes}m`;
-}
-
 function isActiveRunStatus(status: ChatMessage['runStatus']): boolean {
   return status === 'queued' || status === 'running';
 }

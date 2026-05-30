@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
 import { useT } from '../i18n';
 import type { GenerationPreviewModel } from '../runtime/generation-preview';
-import { formatGenerationElapsed } from '../runtime/generation-preview';
 import { Icon } from './Icon';
 import styles from './GenerationPreviewStage.module.css';
 
@@ -12,18 +10,8 @@ type Props = {
 
 export function GenerationPreviewStage({ model, onRetry }: Props) {
   const t = useT();
-  const [now, setNow] = useState(() => Date.now());
 
   const generating = model.phase === 'generating';
-
-  useEffect(() => {
-    if (!generating) return undefined;
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [generating, model.startedAt]);
-
-  const elapsedSec = Math.max(0, Math.round((now - model.startedAt) / 1000));
-  const elapsedLabel = formatGenerationElapsed(elapsedSec);
 
   const stepLabels: Record<GenerationPreviewModel['steps'][number]['id'], string> = {
     understand: t('generationPreview.stepUnderstand'),
@@ -47,7 +35,7 @@ export function GenerationPreviewStage({ model, onRetry }: Props) {
         ? t('generationPreview.stoppedLead')
         : model.phase === 'awaiting-input'
           ? t('generationPreview.awaitingLead')
-          : model.activityLabel || t('generationPreview.footnote');
+          : model.activityLabel;
 
   const markIcon =
     model.phase === 'failed' ? 'close' : model.phase === 'stopped' ? 'stop' : 'sparkles';
@@ -69,11 +57,11 @@ export function GenerationPreviewStage({ model, onRetry }: Props) {
         <Icon name={markIcon} size={24} />
       </div>
       <h1 className={styles.title}>{title}</h1>
-      {showSubstatus ? null : (
+      {!showSubstatus && lead ? (
         <p className={styles.lead} data-live={generating && Boolean(model.activityLabel)}>
           {lead}
         </p>
-      )}
+      ) : null}
       <div
         className={styles.progress}
         data-active={generating}
@@ -116,17 +104,6 @@ export function GenerationPreviewStage({ model, onRetry }: Props) {
               {model.todoProgress.done}/{model.todoProgress.total}
             </span>
           ) : null}
-        </div>
-      ) : null}
-      {generating ? (
-        <div className={styles.meta}>
-          <span data-testid="generation-preview-elapsed">
-            {t('generationPreview.elapsed', { elapsed: elapsedLabel })}
-          </span>
-          <span className={styles.metaDivider} aria-hidden>
-            ·
-          </span>
-          <span>{t('generationPreview.estimate')}</span>
         </div>
       ) : null}
       {model.phase === 'failed' && onRetry ? (
