@@ -48,6 +48,14 @@ function dispatchWebviewNavigate(webview: HTMLElement, url: string) {
   });
 }
 
+function dispatchWebviewTitle(webview: HTMLElement, title: string) {
+  act(() => {
+    const event = new Event('page-title-updated') as Event & { title?: string };
+    event.title = title;
+    webview.dispatchEvent(event);
+  });
+}
+
 describe('DesignBrowserPanel <webview> navigation', () => {
   it('pins the webview src to the load target when the guest commits a redirected URL', () => {
     // Regression guard for the blank-page bug: the embedded <webview> rendered
@@ -132,5 +140,87 @@ describe('DesignBrowserPanel <webview> navigation', () => {
     fireEvent.click(backButton);
     expect(loadURL).toHaveBeenCalledWith('https://example.com/');
     expect(forwardButton.disabled).toBe(false);
+  });
+
+  it('uses native webview history for back navigation when Chromium has it cached', () => {
+    const { container } = render(
+      <DesignBrowserPanel projectId="proj-webview-native" onOpenFile={() => {}} onRefreshFiles={() => {}} />,
+    );
+
+    const input = screen.getByLabelText('Browser address') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'example.com' } });
+    fireEvent.submit(input.closest('form')!);
+
+    const webview = container.querySelector('webview.db-webview') as HTMLElement & {
+      canGoBack?: () => boolean;
+      goBack?: () => void;
+      loadURL?: (url: string) => void;
+    };
+    dispatchWebviewNavigate(webview, 'https://example.com/');
+    dispatchWebviewNavigate(webview, 'https://example.com/docs/');
+
+    const goBack = vi.fn();
+    const loadURL = vi.fn();
+    webview.canGoBack = () => true;
+    webview.goBack = goBack;
+    webview.loadURL = loadURL;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go Back' }));
+
+    expect(goBack).toHaveBeenCalledTimes(1);
+    expect(loadURL).not.toHaveBeenCalled();
+  });
+
+  it('shows extracted page titles in the passive address display and history suggestions', () => {
+    const { container } = render(
+      <DesignBrowserPanel projectId="proj-webview-title" onOpenFile={() => {}} onRefreshFiles={() => {}} />,
+    );
+
+    const input = screen.getByLabelText('Browser address') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'https://www.baidu.com' } });
+    fireEvent.submit(input.closest('form')!);
+
+    const webview = container.querySelector('webview.db-webview') as HTMLElement & {
+      getTitle?: () => string;
+      getURL?: () => string;
+    };
+    webview.getURL = () => 'https://www.baidu.com/';
+    webview.getTitle = () => '百度一下，你就知道';
+    dispatchWebviewNavigate(webview, 'https://www.baidu.com/');
+    dispatchWebviewTitle(webview, '百度一下，你就知道');
+    fireEvent.blur(input);
+
+    expect(input.value).toBe('https://www.baidu.com/ / 百度一下，你就知道');
+
+    fireEvent.focus(input);
+    expect(input.value).toBe('https://www.baidu.com/');
+    expect(screen.getByRole('option', { name: /百度一下，你就知道/ })).toBeTruthy();
+  });
+
+  it('opens all reference suggestions by default from the address bar', () => {
+    render(
+      <DesignBrowserPanel projectId="proj-webview-suggestions" onOpenFile={() => {}} onRefreshFiles={() => {}} />,
+    );
+
+    fireEvent.focus(screen.getByLabelText('Browser address'));
+
+    expect(screen.getByRole('option', { name: /Whirrls/ })).toBeTruthy();
+    expect(screen.getByRole('option', { name: /Startups Gallery/ })).toBeTruthy();
+  });
+
+  it('keeps the browser fallback content free of desktop-only overlay banners', () => {
+    restoreHost?.();
+    restoreHost = null;
+
+    const { container } = render(
+      <DesignBrowserPanel projectId="proj-browser-fallback" onOpenFile={() => {}} onRefreshFiles={() => {}} />,
+    );
+
+    const input = screen.getByLabelText('Browser address') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'https://example.com' } });
+    fireEvent.submit(input.closest('form')!);
+
+    expect(container.querySelector('iframe')).not.toBeNull();
+    expect(screen.queryByText('Embedded browser controls are available in the desktop app.')).toBeNull();
   });
 });

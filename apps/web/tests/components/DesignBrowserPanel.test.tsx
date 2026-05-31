@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   browserFileName,
   browserHarnessTaskMarkdown,
+  faviconUrl,
+  formatAddressDisplay,
+  hostnameFromUrl,
   isHistoryEntry,
   isHistoryUrl,
   labelFromUrl,
@@ -105,6 +108,42 @@ describe('labelFromUrl', () => {
   });
 });
 
+describe('formatAddressDisplay', () => {
+  it('keeps the URL alone when the title is only the host fallback', () => {
+    expect(formatAddressDisplay('https://www.example.com/path', 'example.com')).toBe('https://www.example.com/path');
+  });
+
+  it('appends a real page title for the passive address display', () => {
+    expect(formatAddressDisplay('https://www.baidu.com/', '百度一下，你就知道')).toBe(
+      'https://www.baidu.com/ / 百度一下，你就知道',
+    );
+  });
+
+  it('keeps the blank tab display empty', () => {
+    expect(formatAddressDisplay('about:blank', 'New Tab')).toBe('');
+  });
+});
+
+describe('hostnameFromUrl', () => {
+  it('returns a compact hostname without www', () => {
+    expect(hostnameFromUrl('https://www.example.com/docs')).toBe('example.com');
+  });
+
+  it('falls back to the raw value when parsing fails', () => {
+    expect(hostnameFromUrl('not a url')).toBe('not a url');
+  });
+});
+
+describe('faviconUrl', () => {
+  it('derives a same-origin favicon URL for http pages', () => {
+    expect(faviconUrl('https://www.example.com/docs')).toBe('https://www.example.com/favicon.ico');
+  });
+
+  it('skips non-http urls', () => {
+    expect(faviconUrl('file:///Users/me/page.html')).toBeUndefined();
+  });
+});
+
 describe('isHistoryUrl', () => {
   it('accepts http(s) and file URLs', () => {
     expect(isHistoryUrl('https://example.com')).toBe(true);
@@ -189,7 +228,7 @@ describe('browserFileName', () => {
 describe('isHistoryEntry', () => {
   it('accepts a well-formed entry', () => {
     expect(
-      isHistoryEntry({ url: 'https://x', title: 'X', lastVisitedAt: 1, visitCount: 1 }),
+      isHistoryEntry({ url: 'https://x', title: 'X', iconUrl: 'https://x/favicon.ico', lastVisitedAt: 1, visitCount: 1 }),
     ).toBe(true);
   });
 

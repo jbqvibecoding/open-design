@@ -20,6 +20,7 @@ import {
 import { Icon } from './Icon';
 
 type BrowserHistoryEntry = {
+  iconUrl?: string;
   title: string;
   url: string;
   lastVisitedAt: number;
@@ -77,6 +78,10 @@ type WebviewTitleEvent = Event & {
   title?: string;
 };
 
+type WebviewFaviconEvent = Event & {
+  favicons?: string[];
+};
+
 interface DesignBrowserPanelProps {
   projectId: string;
   onOpenFile: (name: string) => void;
@@ -86,6 +91,8 @@ interface DesignBrowserPanelProps {
 const EMPTY_URL = 'about:blank';
 const DESIGN_BROWSER_PARTITION = 'persist:open-design-design-browser';
 const HISTORY_LIMIT = 80;
+const HISTORY_SUGGESTION_LIMIT = 20;
+const warmedOrigins = new Set<string>();
 
 const REFERENCE_GROUPS: ReferenceGroup[] = [
   {
@@ -175,6 +182,7 @@ export function DesignBrowserPanel({
   const [loadUrl, setLoadUrl] = useState(EMPTY_URL);
   const [currentUrl, setCurrentUrl] = useState(EMPTY_URL);
   const [addressValue, setAddressValue] = useState('');
+  const [addressEditing, setAddressEditing] = useState(false);
   const [history, setHistory] = useState<BrowserHistoryEntry[]>(() => loadHistory(projectId));
   const [navigationStack, setNavigationStack] = useState<BrowserNavigationEntry[]>([]);
   const [navigationIndex, setNavigationIndex] = useState(-1);
@@ -184,6 +192,7 @@ export function DesignBrowserPanel({
   const [webviewNode, setWebviewNode] = useState<WebviewElement | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [savingAction, setSavingAction] = useState<'brief' | 'screenshot' | 'task' | null>(null);
+  const addressInputRef = useRef<HTMLInputElement | null>(null);
   const chromeRef = useRef<HTMLDivElement | null>(null);
   const navigationStackRef = useRef<BrowserNavigationEntry[]>([]);
   const navigationIndexRef = useRef(-1);
@@ -206,6 +215,7 @@ export function DesignBrowserPanel({
     setLoadUrl(EMPTY_URL);
     setCurrentUrl(EMPTY_URL);
     setAddressValue('');
+    setAddressEditing(false);
     setNavigationStack([]);
     setNavigationIndex(-1);
     navigationStackRef.current = [];
@@ -214,7 +224,8 @@ export function DesignBrowserPanel({
   }, [projectId]);
 
   useEffect(() => {
-    saveHistory(projectId, history);
+    const timer = window.setTimeout(() => saveHistory(projectId, history), 140);
+    return () => window.clearTimeout(timer);
   }, [history, projectId]);
 
   useEffect(() => {
@@ -235,15 +246,34 @@ export function DesignBrowserPanel({
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [menuOpen, suggestionsOpen]);
 
-  const commitHistory = useCallback((url: string, title?: string) => {
+  const commitHistory = useCallback((url: string, meta: { title?: string; iconUrl?: string } = {}, options: { countVisit?: boolean } = {}) => {
     if (!isHistoryUrl(url)) return;
     setHistory((current) => {
       const now = Date.now();
       const existing = current.find((entry) => sameUrl(entry.url, url));
-      const nextTitle = title && title.trim() ? title.trim() : labelFromUrl(url);
+      const nextTitle = meta.title && meta.title.trim()
+        ? meta.title.trim()
+        : existing?.title || labelFromUrl(url);
+      const nextIconUrl = cleanIconUrl(meta.iconUrl) || existing?.iconUrl || faviconUrl(url);
+      const visitIncrement = options.countVisit === false ? 0 : 1;
       const entry = existing
-        ? { ...existing, title: nextTitle, lastVisitedAt: now, visitCount: existing.visitCount + 1 }
-        : { title: nextTitle, url, lastVisitedAt: now, visitCount: 1 };
+        ? {
+            ...existing,
+            iconUrl: nextIconUrl,
+            title: nextTitle,
+            lastVisitedAt: visitIncrement > 0 ? now : existing.lastVisitedAt,
+            visitCount: existing.visitCount + visitIncrement,
+          }
+        : { iconUrl: nextIconUrl, title: nextTitle, url, lastVisitedAt: now, visitCount: 1 };
+      if (
+        existing &&
+        existing.title === entry.title &&
+        existing.iconUrl === entry.iconUrl &&
+        existing.lastVisitedAt === entry.lastVisitedAt &&
+        existing.visitCount === entry.visitCount
+      ) {
+        return current;
+      }
       return [entry, ...current.filter((item) => !sameUrl(item.url, url))]
         .slice(0, HISTORY_LIMIT);
     });
@@ -320,21 +350,42 @@ export function DesignBrowserPanel({
     setNavigationState(nextStack, index);
   }, [setNavigationState]);
 
+  const loadWebviewUrl = useCallback((url: string) => {
+    if (!webviewNode) {
+      setLoadUrl(url);
+      return;
+    }
+    if (loadUrl === EMPTY_URL) {
+      setLoadUrl(url);
+      return;
+    }
+    try {
+      const result = webviewNode.loadURL?.(url);
+      if (result instanceof Promise) void result.catch(() => setLoadUrl(url));
+      else if (!webviewNode.loadURL) setLoadUrl(url);
+    } catch {
+      setLoadUrl(url);
+    }
+  }, [loadUrl, webviewNode]);
+
   const navigateTo = useCallback((rawAddress: string) => {
     const nextUrl = normalizeBrowserAddress(rawAddress);
+    warmBrowserOrigin(nextUrl);
     pendingLoadTargetRef.current = isHistoryUrl(nextUrl) ? nextUrl : null;
-    setLoadUrl(nextUrl);
     setCurrentUrl(nextUrl);
     setAddressValue(nextUrl === EMPTY_URL ? '' : nextUrl);
+    setAddressEditing(false);
     setSuggestionsOpen(false);
     setMenuOpen(false);
     if (isHistoryUrl(nextUrl)) {
-      commitHistory(nextUrl);
+      commitHistory(nextUrl, undefined, { countVisit: true });
       recordNavigation(nextUrl);
     } else if (nextUrl === EMPTY_URL) {
+      setLoadUrl(EMPTY_URL);
       recordNavigation(nextUrl);
     }
-  }, [commitHistory, recordNavigation]);
+    if (nextUrl !== EMPTY_URL) loadWebviewUrl(nextUrl);
+  }, [commitHistory, loadWebviewUrl, recordNavigation]);
 
   const updateLoadingState = useCallback((node: WebviewElement | null = webviewNode) => {
     if (!node) {
@@ -356,15 +407,21 @@ export function DesignBrowserPanel({
     const node = webviewNode;
     if (!node) return;
 
-    const syncFromWebview = (url?: string, title?: string, options?: { recordNavigation?: boolean }) => {
+    const syncFromWebview = (
+      url?: string,
+      title?: string,
+      options?: { iconUrl?: string; recordNavigation?: boolean; recordVisit?: boolean },
+    ) => {
       const nextUrl = url || safeGetWebviewUrl(node);
       if (nextUrl) {
         setCurrentUrl(nextUrl);
-        setAddressValue(nextUrl === EMPTY_URL ? '' : nextUrl);
+        if (!addressEditing) {
+          setAddressValue(nextUrl === EMPTY_URL ? '' : nextUrl);
+        }
       }
       const nextTitle = title || safeGetWebviewTitle(node);
       if (nextUrl) {
-        commitHistory(nextUrl, nextTitle);
+        commitHistory(nextUrl, { iconUrl: options?.iconUrl, title: nextTitle }, { countVisit: options?.recordVisit === true });
         if (options?.recordNavigation !== false) {
           recordNavigation(nextUrl, nextTitle, { replacePendingTarget: true });
         } else {
@@ -379,16 +436,25 @@ export function DesignBrowserPanel({
     };
     const onStop = () => {
       setIsLoading(false);
-      syncFromWebview();
+      syncFromWebview(undefined, undefined, { recordVisit: false });
     };
     const onNavigate = (event: Event) => {
       const navigationEvent = event as WebviewNavigationEvent;
       if (navigationEvent.isMainFrame === false) return;
-      syncFromWebview(navigationEvent.url);
+      const pendingTarget = pendingLoadTargetRef.current;
+      const nextUrl = navigationEvent.url || safeGetWebviewUrl(node);
+      const isPendingCommit = Boolean(pendingTarget && nextUrl && sameUrl(pendingTarget, nextUrl));
+      syncFromWebview(nextUrl, undefined, { recordVisit: !isPendingCommit });
     };
     const onTitle = (event: Event) => {
       const titleEvent = event as WebviewTitleEvent;
-      syncFromWebview(undefined, titleEvent.title, { recordNavigation: false });
+      syncFromWebview(undefined, titleEvent.title, { recordNavigation: false, recordVisit: false });
+    };
+    const onFavicon = (event: Event) => {
+      const faviconEvent = event as WebviewFaviconEvent;
+      const iconUrl = faviconEvent.favicons?.find(isHttpLikeUrl);
+      if (!iconUrl) return;
+      syncFromWebview(undefined, undefined, { iconUrl, recordNavigation: false, recordVisit: false });
     };
     const onFail = (event: Event) => {
       const navigationEvent = event as WebviewNavigationEvent;
@@ -403,6 +469,7 @@ export function DesignBrowserPanel({
     node.addEventListener('did-navigate', onNavigate);
     node.addEventListener('did-navigate-in-page', onNavigate);
     node.addEventListener('page-title-updated', onTitle);
+    node.addEventListener('page-favicon-updated', onFavicon);
     node.addEventListener('did-fail-load', onFail);
     node.addEventListener('dom-ready', onStop);
     updateLoadingState(node);
@@ -412,39 +479,46 @@ export function DesignBrowserPanel({
       node.removeEventListener('did-navigate', onNavigate);
       node.removeEventListener('did-navigate-in-page', onNavigate);
       node.removeEventListener('page-title-updated', onTitle);
+      node.removeEventListener('page-favicon-updated', onFavicon);
       node.removeEventListener('did-fail-load', onFail);
       node.removeEventListener('dom-ready', onStop);
     };
-  }, [commitHistory, recordNavigation, updateCurrentNavigationTitle, updateLoadingState, webviewNode]);
+  }, [addressEditing, commitHistory, recordNavigation, updateCurrentNavigationTitle, updateLoadingState, webviewNode]);
 
   const suggestions = useMemo(() => {
     const query = addressValue.trim().toLocaleLowerCase();
+    const showDefaultSuggestions = addressEditing && currentUrl !== EMPTY_URL && sameUrl(addressValue.trim(), currentUrl);
     const referenceSuggestions = REFERENCE_GROUPS.flatMap((group) =>
       group.sites.map((site) => ({
         detail: `${group.title} - ${site.detail}`,
         id: `site:${site.url}`,
+        iconUrl: faviconUrl(site.url),
         label: site.label,
         type: 'Reference' as const,
         url: site.url,
       })),
     );
-    const historySuggestions = history.map((entry) => ({
+    const historySuggestions = history.slice(0, HISTORY_SUGGESTION_LIMIT).map((entry) => ({
       detail: entry.url,
       id: `history:${entry.url}`,
+      iconUrl: entry.iconUrl || faviconUrl(entry.url),
       label: entry.title || labelFromUrl(entry.url),
       type: 'History' as const,
       url: entry.url,
     }));
     const all = [...historySuggestions, ...referenceSuggestions];
-    if (!query) return all.slice(0, 12);
+    if (!query || showDefaultSuggestions) return all;
     return all
       .filter((item) =>
         `${item.label} ${item.url} ${item.detail}`.toLocaleLowerCase().includes(query),
       )
-      .slice(0, 12);
-  }, [addressValue, history]);
+      .slice(0, HISTORY_SUGGESTION_LIMIT + referenceSuggestions.length);
+  }, [addressEditing, addressValue, currentUrl, history]);
 
-  const pageTitle = history.find((entry) => sameUrl(entry.url, currentUrl))?.title || labelFromUrl(currentUrl);
+  const pageHistoryEntry = history.find((entry) => sameUrl(entry.url, currentUrl));
+  const pageTitle = pageHistoryEntry?.title || labelFromUrl(currentUrl);
+  const pageIconUrl = pageHistoryEntry?.iconUrl || faviconUrl(currentUrl);
+  const shownAddressValue = addressEditing ? addressValue : formatAddressDisplay(currentUrl, pageTitle);
   // Drive the start-page/webview branch off the load target, not the committed
   // URL, so a transient about:blank navigation event can't unmount the webview.
   const isBlank = loadUrl === EMPTY_URL;
@@ -452,6 +526,7 @@ export function DesignBrowserPanel({
   async function handleAddressSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     navigateTo(addressValue);
+    addressInputRef.current?.blur();
   }
 
   async function copyCurrentUrl() {
@@ -560,30 +635,19 @@ export function DesignBrowserPanel({
       setLoadUrl(EMPTY_URL);
       setCurrentUrl(EMPTY_URL);
       setAddressValue('');
+      setAddressEditing(false);
       setNavigationState([], -1);
       pendingLoadTargetRef.current = null;
+      saveHistory(projectId, []);
     }
     setMenuOpen(false);
   }
 
   function clearHistoryOnly() {
     setHistory([]);
+    saveHistory(projectId, []);
     setStatusMessage('History cleared');
     setMenuOpen(false);
-  }
-
-  function loadWebviewUrl(url: string) {
-    if (!webviewNode) {
-      setLoadUrl(url);
-      return;
-    }
-    try {
-      const result = webviewNode.loadURL?.(url);
-      if (result instanceof Promise) void result.catch(() => setLoadUrl(url));
-      else if (!webviewNode.loadURL) setLoadUrl(url);
-    } catch {
-      setLoadUrl(url);
-    }
   }
 
   function navigateHistoryBy(delta: -1 | 1) {
@@ -594,9 +658,15 @@ export function DesignBrowserPanel({
     setNavigationState(navigationStack.slice(), targetIndex);
     setCurrentUrl(entry.url);
     setAddressValue(entry.url);
+    setAddressEditing(false);
     setSuggestionsOpen(false);
     setMenuOpen(false);
-    loadWebviewUrl(entry.url);
+    if (webviewNode && canUseNativeHistoryNavigation(webviewNode, delta)) {
+      if (delta < 0) webviewNode.goBack();
+      else webviewNode.goForward();
+    } else {
+      loadWebviewUrl(entry.url);
+    }
   }
 
   function reload(hard = false) {
@@ -645,14 +715,30 @@ export function DesignBrowserPanel({
           </IconTooltipButton>
         </div>
         <form className="db-address-form" onSubmit={handleAddressSubmit}>
-          <Icon name="globe" size={15} />
+          <BrowserSiteIcon
+            className="db-address-site-icon"
+            fallback="globe"
+            iconUrl={isBlank ? undefined : pageIconUrl}
+          />
           <input
-            value={addressValue}
+            ref={addressInputRef}
+            value={shownAddressValue}
             onChange={(event) => {
+              setAddressEditing(true);
               setAddressValue(event.target.value);
               setSuggestionsOpen(true);
             }}
-            onFocus={() => setSuggestionsOpen(true)}
+            onFocus={(event) => {
+              setAddressEditing(true);
+              setAddressValue(isBlank ? '' : currentUrl);
+              setSuggestionsOpen(true);
+              const input = event.currentTarget;
+              window.requestAnimationFrame(() => input.select());
+            }}
+            onBlur={(event) => {
+              if (event.currentTarget.form?.contains(event.relatedTarget as Node | null)) return;
+              window.setTimeout(() => setAddressEditing(false), 80);
+            }}
             placeholder="Enter URL or search..."
             aria-label="Browser address"
             autoComplete="off"
@@ -665,10 +751,15 @@ export function DesignBrowserPanel({
                   key={item.id}
                   type="button"
                   role="option"
+                  onFocus={() => warmBrowserOrigin(item.url)}
+                  onPointerEnter={() => warmBrowserOrigin(item.url)}
                   onClick={() => navigateTo(item.url)}
                 >
                   <span className="db-suggestion-icon">
-                    <Icon name={item.type === 'History' ? 'history' : 'sparkles'} size={14} />
+                    <BrowserSiteIcon
+                      fallback={item.type === 'History' ? 'history' : 'globe'}
+                      iconUrl={item.iconUrl}
+                    />
                   </span>
                   <span className="db-suggestion-copy">
                     <span>{item.label}</span>
@@ -757,13 +848,6 @@ export function DesignBrowserPanel({
         ) : (
           <div className="db-fallback">
             <iframe title={pageTitle} src={loadUrl} />
-            <div className="db-fallback-bar">
-              <span>Embedded browser controls are available in the desktop app.</span>
-              <button type="button" onClick={openCurrentExternally}>
-                <Icon name="external-link" size={14} />
-                Open
-              </button>
-            </div>
           </div>
         )}
       </div>
@@ -808,14 +892,13 @@ function DesignBrowserStart({
       <div className="db-start-hero">
         <div>
           <div className="db-kicker">Open Design browser</div>
-          <h2>Reference, extract, apply.</h2>
+          <h2>Reference Board</h2>
         </div>
         <div className="db-agent-card">
           <div className="db-agent-card-title">
             <Icon name="sparkles" size={15} />
             Browser Harness
           </div>
-          <p>Turn any opened reference into a saved extraction task for browser-use and artifacts.</p>
         </div>
       </div>
       <div className="db-reference-grid">
@@ -824,10 +907,21 @@ function DesignBrowserStart({
             <h3>{group.title}</h3>
             <div className="db-reference-list">
               {group.sites.map((site) => (
-                <article key={site.url} className="db-reference-card">
+                <article
+                  key={site.url}
+                  className="db-reference-card"
+                  onPointerEnter={() => warmBrowserOrigin(site.url)}
+                >
                   <button type="button" onClick={() => onNavigate(site.url)}>
-                    <span>{site.label}</span>
-                    <small>{new URL(site.url).hostname.replace(/^www\./, '')}</small>
+                    <BrowserSiteIcon
+                      className="db-reference-icon"
+                      fallback="globe"
+                      iconUrl={faviconUrl(site.url)}
+                    />
+                    <span className="db-reference-title">
+                      <span>{site.label}</span>
+                      <small>{hostnameFromUrl(site.url)}</small>
+                    </span>
                   </button>
                   <p>{site.detail}</p>
                   <div className="db-reference-actions">
@@ -851,6 +945,28 @@ function DesignBrowserStart({
         ))}
       </div>
     </div>
+  );
+}
+
+function BrowserSiteIcon({
+  className,
+  fallback,
+  iconUrl,
+}: {
+  className?: string;
+  fallback: 'globe' | 'history';
+  iconUrl?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const cleanUrl = cleanIconUrl(iconUrl);
+  return (
+    <span className={['db-site-icon', className].filter(Boolean).join(' ')}>
+      {cleanUrl && !failed ? (
+        <img alt="" src={cleanUrl} onError={() => setFailed(true)} />
+      ) : (
+        <Icon name={fallback} size={13} />
+      )}
+    </span>
   );
 }
 
@@ -889,7 +1005,8 @@ export function isHistoryEntry(value: unknown): value is BrowserHistoryEntry {
     typeof record.url === 'string' &&
     typeof record.title === 'string' &&
     typeof record.lastVisitedAt === 'number' &&
-    typeof record.visitCount === 'number'
+    typeof record.visitCount === 'number' &&
+    (record.iconUrl === undefined || typeof record.iconUrl === 'string')
   );
 }
 
@@ -920,6 +1037,32 @@ export function labelFromUrl(url: string): string {
   }
 }
 
+export function formatAddressDisplay(url: string, title?: string): string {
+  if (url === EMPTY_URL) return '';
+  const cleanTitle = title?.trim();
+  if (!cleanTitle) return url;
+  const fallback = labelFromUrl(url);
+  if (cleanTitle === fallback || cleanTitle === url) return url;
+  return `${url} / ${cleanTitle}`;
+}
+
+export function hostnameFromUrl(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+export function faviconUrl(url: string): string | undefined {
+  if (!isHttpLikeUrl(url)) return undefined;
+  try {
+    return new URL('/favicon.ico', new URL(url).origin).toString();
+  } catch {
+    return undefined;
+  }
+}
+
 export function isHistoryUrl(url: string): boolean {
   return url !== EMPTY_URL && (isHttpLikeUrl(url) || /^file:\/\//i.test(url));
 }
@@ -945,6 +1088,41 @@ function safeGetWebviewTitle(node: WebviewElement): string {
     return node.getTitle();
   } catch {
     return '';
+  }
+}
+
+function cleanIconUrl(url?: string): string | undefined {
+  const value = url?.trim();
+  if (!value) return undefined;
+  if (/^https?:\/\//i.test(value) || /^data:image\//i.test(value)) return value;
+  return undefined;
+}
+
+function warmBrowserOrigin(url: string): void {
+  if (typeof document === 'undefined' || !isHttpLikeUrl(url)) return;
+  let origin: string;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    return;
+  }
+  if (warmedOrigins.has(origin)) return;
+  warmedOrigins.add(origin);
+  for (const rel of ['dns-prefetch', 'preconnect']) {
+    const link = document.createElement('link');
+    link.rel = rel;
+    link.href = origin;
+    if (rel === 'preconnect') link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+  }
+}
+
+function canUseNativeHistoryNavigation(node: WebviewElement, delta: -1 | 1): boolean {
+  try {
+    if (delta < 0) return typeof node.canGoBack === 'function' && node.canGoBack();
+    return typeof node.canGoForward === 'function' && node.canGoForward();
+  } catch {
+    return false;
   }
 }
 

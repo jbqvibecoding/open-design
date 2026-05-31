@@ -239,11 +239,15 @@
 /* Design browser workspace module. */
 .design-browser {
   flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg);
   color: var(--text);
+  overflow: hidden;
 }
 .db-chrome {
   position: relative;
@@ -251,9 +255,11 @@
   grid-template-columns: auto minmax(220px, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  min-width: 0;
+  padding: 7px 12px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-panel) 96%, #fff) 0%, var(--bg-panel) 100%);
   z-index: 3;
 }
 .db-nav,
@@ -298,11 +304,11 @@
   transform: translate(-50%, 0);
 }
 .db-icon-btn {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 7px;
   background: transparent;
   color: var(--text-muted);
   display: inline-flex;
@@ -312,7 +318,7 @@
   transition: background 120ms cubic-bezier(0.23, 1, 0.32, 1), color 120ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .db-icon-btn:hover:not(:disabled) {
-  background: var(--bg-subtle);
+  background: color-mix(in srgb, var(--bg-subtle) 78%, var(--text) 4%);
   color: var(--text);
 }
 .db-icon-btn:disabled {
@@ -331,20 +337,48 @@
 }
 .db-address-form {
   position: relative;
-  height: 34px;
+  height: 36px;
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg) 88%, var(--bg-panel));
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px;
+  gap: 9px;
+  padding: 0 11px;
+  overflow: visible;
+  transition: background 140ms cubic-bezier(0.23, 1, 0.32, 1), border-color 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.db-address-form:hover {
+  border-color: color-mix(in srgb, var(--border) 70%, var(--text-muted));
+  background: var(--bg);
 }
 .db-address-form:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--border) 55%, var(--text-muted));
+  box-shadow: none;
+  background: var(--bg);
+}
+.db-site-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  overflow: hidden;
+}
+.db-site-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 3px;
+  object-fit: contain;
+}
+.db-address-site-icon {
+  width: 17px;
+  height: 17px;
 }
 .db-address-form input {
   flex: 1 1 auto;
@@ -365,11 +399,11 @@
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  max-height: min(420px, calc(100vh - 160px));
+  max-height: min(520px, calc(100vh - 136px));
   padding: 6px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-panel);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-panel) 96%, var(--bg));
   box-shadow: var(--shadow-lg);
   overflow-y: auto;
   z-index: 220;
@@ -382,7 +416,7 @@
   align-items: center;
   gap: 9px;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   background: transparent;
   color: var(--text);
   padding: 7px 8px;
@@ -390,12 +424,12 @@
   text-align: left;
 }
 .db-suggestions button:hover {
-  background: var(--bg-subtle);
+  background: color-mix(in srgb, var(--bg-subtle) 78%, var(--text) 4%);
 }
 .db-suggestion-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   background: var(--bg-subtle);
   color: var(--text-muted);
   display: inline-flex;
@@ -478,9 +512,11 @@
 .db-content {
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
   position: relative;
   display: flex;
   background: var(--bg);
+  overflow: hidden;
 }
 .db-webview,
 .db-fallback,
@@ -500,25 +536,6 @@
 .db-fallback iframe {
   background: #fff;
 }
-.db-fallback-bar {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px 8px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
-  color: var(--text-muted);
-  font-size: 12px;
-  box-shadow: var(--shadow-lg);
-}
-.db-fallback-bar button,
 .db-reference-actions button {
   min-height: 28px;
   display: inline-flex;
@@ -532,7 +549,6 @@
   font-size: 12px;
   cursor: pointer;
 }
-.db-fallback-bar button:hover,
 .db-reference-actions button:hover:not(:disabled) {
   background: var(--bg-subtle);
 }
@@ -540,16 +556,18 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
-  padding: 28px;
-  background: var(--bg);
+  max-width: 100%;
+  overflow: auto;
+  padding: 18px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-panel) 30%, var(--bg)) 0%, var(--bg) 34%);
+  overscroll-behavior: contain;
 }
 .db-start-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
-  gap: 24px;
-  align-items: end;
-  padding: 10px 0 24px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 0 0 14px;
   border-bottom: 1px solid var(--border);
 }
 .db-kicker {
@@ -560,17 +578,17 @@
 }
 .db-start h2 {
   max-width: 720px;
-  margin: 8px 0 0;
+  margin: 5px 0 0;
   color: var(--text);
-  font-size: 46px;
-  line-height: 0.96;
+  font-size: 28px;
+  line-height: 1.02;
   letter-spacing: 0;
 }
 .db-agent-card {
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--bg-panel);
-  padding: 14px;
+  background: color-mix(in srgb, var(--bg-panel) 92%, var(--bg-subtle));
+  padding: 9px 11px;
 }
 .db-agent-card-title {
   display: flex;
@@ -589,14 +607,14 @@
 .db-reference-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-  padding-top: 22px;
+  gap: 12px;
+  padding-top: 14px;
 }
 .db-reference-group {
   min-width: 0;
 }
 .db-reference-group h3 {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
@@ -606,21 +624,26 @@
 .db-reference-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 .db-reference-card {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-panel) 94%, var(--bg));
+  padding: 9px;
+  transition: border-color 140ms cubic-bezier(0.23, 1, 0.32, 1), background 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.db-reference-card:hover {
+  border-color: color-mix(in srgb, var(--border) 58%, var(--text-muted));
   background: var(--bg-panel);
-  padding: 12px;
 }
 .db-reference-card > button {
   width: 100%;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
   border: 0;
   background: transparent;
   color: var(--text);
@@ -628,27 +651,42 @@
   cursor: pointer;
   text-align: left;
 }
-.db-reference-card > button span,
-.db-reference-card > button small {
+.db-reference-icon {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  padding: 4px;
+}
+.db-reference-title {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.db-reference-title span,
+.db-reference-title small {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.db-reference-card > button span {
+.db-reference-title span {
   font-size: 14px;
   font-weight: 700;
 }
-.db-reference-card > button small {
+.db-reference-title small {
   color: var(--text-faint);
   font-size: 11px;
 }
 .db-reference-card p {
-  margin: 8px 0 12px;
-  min-height: 36px;
+  margin: 7px 0 9px;
+  min-height: 34px;
   color: var(--text-muted);
-  font-size: 12.5px;
-  line-height: 1.45;
+  font-size: 12px;
+  line-height: 1.38;
 }
 .db-reference-actions {
   display: flex;

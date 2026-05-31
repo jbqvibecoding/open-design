@@ -4297,7 +4297,12 @@ export function ProjectView({
             >
               <Icon name="sliders" size={16} />
             </button>
-            <HandoffButton projectId={project.id} />
+            <HandoffButton
+              projectId={project.id}
+              projectName={project.name}
+              projectDir={projectDetail.resolvedDir}
+              agents={agents}
+            />
             <AvatarMenu
               config={config}
               agents={agents}
