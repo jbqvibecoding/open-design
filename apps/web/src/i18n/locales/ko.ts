@@ -923,6 +923,7 @@ export const ko: Dict = {
   'chat.cliSettingsTitle': 'CLI 및 모델 설정',
   'chat.cliSettingsAria': 'CLI 및 모델 설정 열기',
   'chat.attachTitle': '파일 첨부 (또는 붙여넣기 / 끌어놓기)',
+  'chat.addContextTitle': 'Add context',
   'chat.attachAria': '파일 첨부',
   'chat.importTitle': '소스 가져오기 (곧 지원 예정)',
   'chat.importLabel': '가져오기',

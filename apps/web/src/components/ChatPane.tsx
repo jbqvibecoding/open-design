@@ -518,6 +518,10 @@ interface Props {
   // Same dialog, but landing on the External MCP tab. Forwarded to the
   // composer's `/mcp` slash and MCP picker button.
   onOpenMcpSettings?: () => void;
+  // The composer "+" menu's "add plugin" / "add connector" rows route to the
+  // home plugin-registry / connector-integration surfaces.
+  onBrowsePlugins?: () => void;
+  onOpenConnectors?: () => void;
   // True when this project is a GitHub-backed design system whose repository
   // evidence has not fully landed. Surfaces a "Connect your repo" CTA in the
   // empty chat state alongside the starter examples.
@@ -670,6 +674,8 @@ export function ChatPane({
   onSwitchToAmrAndRetry,
   onLaunchAntigravityOauth,
   onOpenMcpSettings,
+  onBrowsePlugins,
+  onOpenConnectors,
   connectRepoNeeded,
   githubConnected,
   onConnectRepo,
@@ -1571,6 +1577,8 @@ export function ChatPane({
       onStop={onStop}
       onOpenSettings={onOpenSettings}
       onOpenMcpSettings={onOpenMcpSettings}
+      onBrowsePlugins={onBrowsePlugins}
+      onOpenConnectors={onOpenConnectors}
       petConfig={petConfig}
       onAdoptPet={onAdoptPet}
       onTogglePet={onTogglePet}

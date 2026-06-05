@@ -1035,6 +1035,7 @@ export const id: Dict = {
   'chat.cliSettingsTitle': 'Pengaturan CLI',
   'chat.cliSettingsAria': 'Buka pengaturan CLI',
   'chat.attachTitle': 'Lampirkan',
+  'chat.addContextTitle': 'Add context',
   'chat.attachAria': 'Lampirkan file atau konteks',
   'chat.importTitle': 'Impor',
   'chat.importLabel': 'Impor konteks',

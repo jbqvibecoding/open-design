@@ -1178,6 +1178,7 @@ export const zhTW: Dict = {
   'chat.cliSettingsTitle': 'CLI 與模型設定',
   'chat.cliSettingsAria': '開啟 CLI 與模型設定',
   'chat.attachTitle': '附加檔案（也可以貼上/拖入）',
+  'chat.addContextTitle': '新增內容',
   'chat.attachAria': '附加檔案',
   'chat.importTitle': '匯入素材（即將上線）',
   'chat.importLabel': '匯入',

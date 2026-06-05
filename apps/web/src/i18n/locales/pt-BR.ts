@@ -944,6 +944,7 @@ export const ptBR: Dict = {
   'chat.cliSettingsTitle': 'Configurações de CLI e modelo',
   'chat.cliSettingsAria': 'Abrir configurações de CLI e modelo',
   'chat.attachTitle': 'Anexar arquivos (ou colar / arrastar)',
+  'chat.addContextTitle': 'Add context',
   'chat.attachAria': 'Anexar arquivos',
   'chat.importTitle': 'Importar fontes (em breve)',
   'chat.importLabel': 'Importar',

@@ -923,6 +923,7 @@ export const hu: Dict = {
   'chat.cliSettingsTitle': 'CLI- és modellbeállítások',
   'chat.cliSettingsAria': 'CLI- és modellbeállítások megnyitása',
   'chat.attachTitle': 'Fájlok csatolása (vagy beillesztés / húzás)',
+  'chat.addContextTitle': 'Add context',
   'chat.attachAria': 'Fájlok csatolása',
   'chat.importTitle': 'Források importálása (hamarosan)',
   'chat.importLabel': 'Importálás',

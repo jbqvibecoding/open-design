@@ -923,6 +923,7 @@ export const pl: Dict = {
   'chat.cliSettingsTitle': 'Ustawienia CLI i modelu',
   'chat.cliSettingsAria': 'Otwórz ustawienia CLI i modelu',
   'chat.attachTitle': 'Załącz pliki (lub wklej / przeciągnij)',
+  'chat.addContextTitle': 'Add context',
   'chat.attachAria': 'Załącz pliki',
   'chat.importTitle': 'Importuj źródła (wkrótce)',
   'chat.importLabel': 'Importuj',

@@ -945,6 +945,7 @@ export const fa: Dict = {
   'chat.cliSettingsTitle': 'تنظیمات CLI و مدل',
   'chat.cliSettingsAria': 'باز کردن تنظیمات CLI و مدل',
   'chat.attachTitle': 'ضمیمه کردن فایل‌ها (یا چسباندن / رها کردن)',
+  'chat.addContextTitle': 'Add context',
   'chat.attachAria': 'ضمیمه کردن فایل‌ها',
   'chat.importTitle': 'وارد کردن منابع (به زودی)',
   'chat.importLabel': 'وارد کردن',

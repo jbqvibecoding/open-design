@@ -876,6 +876,7 @@ export const th: Dict = {
   'chat.cliSettingsTitle': 'ตั้งค่าโมเดลและ CLI',
   'chat.cliSettingsAria': 'ตั้งค่า',
   'chat.attachTitle': 'แนบไฟล์ (วาง / ลาก)',
+  'chat.addContextTitle': 'Add context',
   'chat.attachAria': 'แนบไฟล์',
   'chat.importTitle': 'นำเข้าจากที่อื่น (เร็วๆ นี้)',
   'chat.importLabel': 'นำเข้า',

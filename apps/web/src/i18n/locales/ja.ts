@@ -810,6 +810,7 @@ export const ja: Dict = {
   'chat.cliSettingsTitle': 'CLI とモデルの設定',
   'chat.cliSettingsAria': 'CLI とモデルの設定を開く',
   'chat.attachTitle': 'ファイルを添付（または貼り付け / ドロップ）',
+  'chat.addContextTitle': 'Add context',
   'chat.attachAria': 'ファイルを添付',
   'chat.importTitle': 'ソースをインポート（近日公開）',
   'chat.importLabel': 'インポート',

@@ -923,6 +923,7 @@ export const ar: Dict = {
   'chat.cliSettingsTitle': 'إعدادات CLI والنموذج',
   'chat.cliSettingsAria': 'فتح إعدادات CLI والنموذج',
   'chat.attachTitle': 'إرفاق ملفات (أو الصق / اسحب)',
+  'chat.addContextTitle': 'Add context',
   'chat.attachAria': 'إرفاق ملفات',
   'chat.importTitle': 'استيراد المصادر (قريباً)',
   'chat.importLabel': 'استيراد',
